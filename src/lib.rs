@@ -1,3 +1,5 @@
+mod config_reader;
+
 #[macro_use]
 extern crate lazy_static;
 
@@ -10,10 +12,7 @@ use std::string::String;
 use regex::Regex;
 use std::fmt::Display;
 use thiserror::Error;
-use std::error::Error;
-use std::path::Path;
-use std::fs::File;
-use std::io::BufReader;
+use crate::config_reader::ConfigReader;
 
 #[derive(Debug)]
 pub struct Config {
@@ -33,12 +32,12 @@ impl Config {
   /// # Examples
   ///
   /// ```
-  /// use operator_config::{Config, ConfigJsonReader};
-  /// path_to_config = "path/to/config.json";
+  /// use product_config::{Config, ConfigJsonReader};
+  /// path_to_config = String::from("path/to/config.json");
   /// config_reader = ConfigJsonReader::new(path_to_config);
   /// config = Config::new(config_reader);
   /// ```
-  pub fn new<CR: ConfigReader>(config_reader: CR) -> Self {
+  pub fn new<'a, CR: ConfigReader<'a ,ConfigItem>>(config_reader: CR) -> Self {
     let config: ConfigItem = config_reader.read().unwrap();
     // convert config options
     let mut config_options: HashMap<String, ConfigOption> = HashMap::new();
@@ -102,7 +101,7 @@ impl Config {
   /// # Examples
   ///
   /// ```
-  /// use operator_config::{Config, ConfigJsonReader, ConfigError};
+  /// use product_config::{Config, ConfigError};
   /// path_to_config = "path/to/config.json";
   /// config_reader = ConfigJsonReader::new(path_to_config);
   /// config = Config::new(config_reader);
@@ -453,39 +452,14 @@ enum Importance {
   Required,
 }
 
-/// trait for different config readers for json or yaml
-pub trait ConfigReader {
-  fn read(&self) -> Result<ConfigItem, Box<dyn Error>>;
-}
-
-/// specific json config reader struct
-pub struct ConfigJsonReader<P: AsRef<Path>> {
-  path: P,
-}
-
-impl<P: AsRef<Path>> ConfigJsonReader<P> {
-  pub fn new(path: P) -> Self {
-    ConfigJsonReader { path }
-  }
-}
-
-impl<P: AsRef<Path>> ConfigReader for ConfigJsonReader<P> {
-  /// specific json config reader "read" implementation
-  fn read(&self) -> Result<ConfigItem, Box<dyn Error>> {
-    let file = File::open(&self.path)?;
-    let reader = BufReader::new(file);
-    let config_options = serde_json::from_reader(reader)?;
-    Ok(config_options)
-  }
-}
-
 #[cfg(test)]
 mod tests {
-  use crate::{Config, ConfigJsonReader, ConfigError};
+  use crate::config_reader::ConfigJsonReader;
+  use crate::{Config, ConfigError};
   use rstest::*;
 
   lazy_static! {
-    static ref CONFIG: Config = Config::new(ConfigJsonReader::new("data/test_config.json"));
+    static ref CONFIG: Config = Config::new(ConfigJsonReader::new("data/test_config.json".to_string()));
   }
 
   static ENV_VAR_INTEGER_PORT_MIN_MAX: &str = "ENV_VAR_INTEGER_PORT_MIN_MAX";
