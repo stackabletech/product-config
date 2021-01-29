@@ -1,5 +1,5 @@
 [package]
-name = "operator-config"
+name = "product-config"
 version = "0.1.0"
 authors = ["Malte Sander <malte.sander.it@gmail.com>"]
 edition = "2018"
