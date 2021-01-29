@@ -1,6 +1,5 @@
 mod config_reader;
 
-#[macro_use]
 extern crate lazy_static;
 
 use serde::Deserialize;
