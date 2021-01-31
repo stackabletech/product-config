@@ -1,7 +1,5 @@
 mod config_reader;
 
-extern crate lazy_static;
-
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::str;
@@ -11,7 +9,7 @@ use std::string::String;
 use regex::Regex;
 use std::fmt::Display;
 use thiserror::Error;
-use crate::config_reader::ConfigReader;
+use config_reader::ConfigReader;
 
 #[derive(Debug)]
 pub struct Config {
@@ -31,10 +29,6 @@ impl Config {
   /// # Examples
   ///
   /// ```
-  /// use product_config::{Config, ConfigJsonReader};
-  /// path_to_config = String::from("path/to/config.json");
-  /// config_reader = ConfigJsonReader::new(path_to_config);
-  /// config = Config::new(config_reader);
   /// ```
   pub fn new<'a, CR: ConfigReader<'a ,ConfigItem>>(config_reader: CR) -> Self {
     let config: ConfigItem = config_reader.read().unwrap();
@@ -100,25 +94,6 @@ impl Config {
   /// # Examples
   ///
   /// ```
-  /// use product_config::{Config, ConfigError};
-  /// path_to_config = "path/to/config.json";
-  /// config_reader = ConfigJsonReader::new(path_to_config);
-  /// config = Config::new(config_reader);
-  /// match config::validate("some_product_version","some_config_property","some_config_property_value") {
-  ///   Ok(_) => {}
-  ///   Err(e) => match e {
-  ///     ConfigError::ConfigValueNotFound(_) => {}
-  ///     ConfigError::ConfigVersionNotSupported(_, _, _) => {}
-  ///     ConfigError::ConfigVersionDeprecated(_, _, _) => {}
-  ///     ConfigError::ConfigValueMinOutOfBounds(_, _, _) => {}
-  ///     ConfigError::ConfigValueMaxOutOfBounds(_, _, _) => {}
-  ///     ConfigError::ConfigValueEmptyOrNone(_) => {}
-  ///     ConfigError::ConfigValueNotInAllowedValues(_, _, _) => {}
-  ///     ConfigError::DataFormatTypeNotParsable(_, _, _) => {}
-  ///     ConfigError::DataFormatNoUnitProvided(_) => {}
-  ///     ConfigError::DataFormatNoRegexMatch(_, _) => {}
-  ///   }
-  /// }
   /// ```
   pub fn validate(
     &self,
@@ -457,10 +432,6 @@ mod tests {
   use crate::{Config, ConfigError};
   use rstest::*;
 
-  lazy_static! {
-    static ref CONFIG: Config = Config::new(ConfigJsonReader::new("data/test_config.json".to_string()));
-  }
-
   static ENV_VAR_INTEGER_PORT_MIN_MAX: &str = "ENV_VAR_INTEGER_PORT_MIN_MAX";
   static CONF_PROPERTY_STRING_MEMORY :&str = "conf.property.string.memory";
   static CONF_PROPERTY_STRING_DEPRECATED: &str = "conf.property.string.deprecated";
@@ -495,7 +466,8 @@ mod tests {
   ::trace
   )]
   fn test_data_format(product_version: &str, config_option_name: &str, config_option_value: &str, expected: Result<String, ConfigError>) {
-    let result = CONFIG.validate(product_version, config_option_name, config_option_value);
+    let config = Config::new(ConfigJsonReader::new("data/test_config.json".to_string()));
+    let result = config.validate(product_version, config_option_name, config_option_value);
     assert_eq!(result, expected)
   }
 
