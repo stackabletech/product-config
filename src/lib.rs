@@ -1,4 +1,8 @@
-mod config_reader;
+#[macro_use]
+extern crate lazy_static;
+
+mod reader;
+mod version;
 
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -6,7 +10,7 @@ use std::str;
 use std::str::FromStr;
 use std::string::String;
 
-use config_reader::ConfigReader;
+use reader::ConfigReader;
 use regex::Regex;
 use std::fmt::Display;
 use thiserror::Error;
@@ -437,7 +441,7 @@ enum Importance {
 
 #[cfg(test)]
 mod tests {
-    use crate::config_reader::ConfigJsonReader;
+    use crate::reader::ConfigJsonReader;
     use crate::{Config, ConfigError};
     use rstest::*;
 
