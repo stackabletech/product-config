@@ -1,5 +1,5 @@
 {
-  "config_setting": {
+  "config_settings": {
     "unit": [
       {
         "name": "url",
@@ -28,10 +28,6 @@
       {
         "name": "password",
         "regex": "^[a-zA-Z]\\w{3,14}$"
-      },
-      {
-        "name": "date",
-        "regex": ""
       },
       {
         "name": "ip",
@@ -63,17 +59,24 @@
       },
       {
         "name": "text",
-        "regex": ""
+        "regex": ".*"
       }
     ]
   },
-
   "config_options": [
     {
-      "property": "",
-      "env": "ENV_VAR_INTEGER_PORT_MIN_MAX",
-      "data_format": {
-        "datatype": "integer",
+      "option_names": [
+        {
+          "name": "ENV_VAR_INTEGER_PORT_MIN_MAX",
+          "kind": "env"
+        },
+        {
+          "name": "env.var.integer.port.min.max",
+          "kind": "conf"
+        }
+      ],
+      "datatype": {
+        "type": "integer",
         "min": "0",
         "max": "65535",
         "unit": "port"
@@ -81,20 +84,36 @@
       "as_of_version": "0.5.0"
     },
     {
-      "property": "",
-      "env": "conf.property.string.memory",
-      "data_format": {
-        "datatype": "string",
+      "option_names": [
+        {
+          "name": "CONF_PROPERTY_STRING_MEMORY",
+          "kind": "env"
+        },
+        {
+          "name": "conf.property.string.memory",
+          "kind": "conf"
+        }
+      ],
+      "datatype": {
+        "type": "string",
         "unit": "memory"
       },
       "allowed_values": [],
       "as_of_version": "0.5.0"
     },
     {
-      "property": "",
-      "env": "conf.property.string.deprecated",
-      "data_format": {
-        "datatype": "string",
+      "option_names": [
+        {
+          "name": "CONF_PROPERTY_STRING_DEPRECATED",
+          "kind": "env"
+        },
+        {
+          "name": "conf.property.string.deprecated",
+          "kind": "conf"
+        }
+      ],
+      "datatype": {
+        "type": "string",
         "unit": "memory"
       },
       "allowed_values": [],
@@ -102,11 +121,19 @@
       "deprecated_since": "0.4.0"
     },
     {
-      "property": "ENV_VAR_ALLOWED_VALUES",
-      "env": "",
+      "option_names": [
+        {
+          "name": "ENV_VAR_ALLOWED_VALUES",
+          "kind": "env"
+        },
+        {
+          "name": "env.var.allowed.values",
+          "kind": "conf"
+        }
+      ],
       "default_value": [],
-      "data_format": {
-        "datatype": "string",
+      "datatype": {
+        "type": "string",
         "max": "255",
         "unit": "text"
       },
