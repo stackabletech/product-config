@@ -92,7 +92,19 @@
 //!             "4g"
 //!          ],
 //!          "as_of_version":"1.0.0",
+//!          "depends_on": [
+//!            {
+//!               "option_names":[
+//!                  {
+//!                     "name":"ANOTHER_PROPERTY",
+//!                     "kind":"env"
+//!                  }
+//!               ],
+//!               "value": true
+//!             }
+//!          ],
 //!          "importance":"required",
+//!          "apply_mode": "restart"
 //!          "additional_doc":"http://additional.doc",
 //!          "description":"Set the memory for x"
 //!       }
@@ -235,6 +247,7 @@ impl Config {
     /// * `product_version` - product / controller version
     /// * `option_version` - as of version of the provided config option
     /// * `deprecated_since` - version from which point onwards the option is deprecated
+    ///
     fn check_version_supported_or_deprecated(
         &self,
         option_name: &str,
@@ -275,6 +288,7 @@ impl Config {
     /// * `option_name` - name of the config option (config property or environmental variable)
     /// * `option_value` - config option value to be validated
     /// * `datatype` - containing min/max bounds, units etc.
+    ///
     fn check_datatype(
         &self,
         option_name: &str,
@@ -308,6 +322,7 @@ impl Config {
     /// * `option_name` - name of the config option (config property or environmental variable)
     /// * `option_value` - config option value to be validated
     /// * `allowed_values` - vector of allowed values
+    ///
     fn check_allowed_values(
         &self,
         option_name: &str,
@@ -349,6 +364,7 @@ impl Config {
     /// * `option_value` - config option value to be validated
     /// * `min` - minimum value specified in config_option.data_format.min
     /// * `max` - maximum value specified in config_option.data_format.max
+    ///
     fn check_datatype_scalar<T>(
         &self,
         option_name: &str,
@@ -408,6 +424,7 @@ impl Config {
     /// * `min` - minimum value specified in config_option.data_format.min
     /// * `max` - maximum value specified in config_option.data_format.max
     /// * `unit` - provided unit to get the regular expression to parse the option_value
+    ///
     fn check_datatype_string(
         &self,
         option_name: &str,
@@ -495,7 +512,7 @@ pub struct ConfigOption {
     deprecated_since: Option<String>,
     deprecated_for: Option<Vec<String>>,
     depends_on: Option<Vec<Dependency>>,
-    importance: Option<Importance>,
+    priority: Option<Priority>,
     apply_mode: Option<ApplyMode>,
     tags: Option<Vec<String>>,
     additional_doc: Option<Vec<String>>,
@@ -574,20 +591,32 @@ struct Dependency {
     value: Option<String>,
 }
 
-/// represents all supported "importance" parameters
+/// represents all supported priority options
 #[derive(Deserialize, Clone, Debug)]
 #[serde(rename_all = "lowercase")]
-enum Importance {
+enum Priority {
     Optional,
     Required,
 }
 
-/// represents all supported "importance" parameters
+impl Default for Priority {
+    fn default() -> Self {
+        Priority::Required
+    }
+}
+
+/// represents how config options are applied
 #[derive(Deserialize, Clone, Debug)]
 #[serde(rename_all = "lowercase")]
 enum ApplyMode {
     Dynamic,
-    Required,
+    Restart,
+}
+
+impl Default for ApplyMode {
+    fn default() -> Self {
+        ApplyMode::Restart
+    }
 }
 
 #[cfg(test)]
