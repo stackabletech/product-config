@@ -99,8 +99,8 @@
 //!    ]
 //! }
 //!
-mod error;
-mod reader;
+pub mod error;
+pub mod reader;
 
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -494,17 +494,12 @@ pub struct ConfigOption {
     as_of_version: String,
     deprecated_since: Option<String>,
     deprecated_for: Option<Vec<String>>,
+    depends_on: Option<Vec<Dependency>>,
     importance: Option<Importance>,
+    apply_mode: Option<ApplyMode>,
     tags: Option<Vec<String>>,
     additional_doc: Option<Vec<String>>,
     description: Option<String>,
-}
-
-/// represents the config unit (name corresponds to the unit type like password and a given regex)
-#[derive(Deserialize, Debug)]
-pub struct Unit {
-    name: String,
-    regex: Option<String>,
 }
 
 /// represents (one of multiple) unique identifier for a config option depending on the type
@@ -512,6 +507,13 @@ pub struct Unit {
 struct OptionName {
     name: String,
     kind: OptionKind,
+}
+
+/// represents the config unit (name corresponds to the unit type like password and a given regex)
+#[derive(Deserialize, Debug)]
+pub struct Unit {
+    name: String,
+    regex: Option<String>,
 }
 
 /// represents different config identifier types like config property, environment variable, command line parameter etc.
@@ -564,11 +566,27 @@ pub enum Datatype {
     },
 }
 
+/// represents a dependency on another config option and (if available) a required value
+/// e.g. to set ssl certificates one has to set some property use_ssl to true
+#[derive(Deserialize, Clone, Debug)]
+struct Dependency {
+    option_name: OptionName,
+    value: Option<String>,
+}
+
 /// represents all supported "importance" parameters
 #[derive(Deserialize, Clone, Debug)]
 #[serde(rename_all = "lowercase")]
 enum Importance {
     Optional,
+    Required,
+}
+
+/// represents all supported "importance" parameters
+#[derive(Deserialize, Clone, Debug)]
+#[serde(rename_all = "lowercase")]
+enum ApplyMode {
+    Dynamic,
     Required,
 }
 
