@@ -143,6 +143,62 @@
         "allowed_value3"
       ],
       "as_of_version": "0.1.0"
+    },
+    {
+      "option_names": [
+        {
+          "name": "ENV_VAR_SECURITY",
+          "kind": "env"
+        },
+        {
+          "name": "env.var.security",
+          "kind": "conf"
+        }
+      ],
+      "datatype": {
+        "type": "bool"
+      },
+      "default_value": [
+        {
+          "from_version": "0.5.0",
+          "value": "false"
+        }
+      ],
+      "as_of_version": "0.5.0",
+      "apply_mode": "restart"
+    },
+    {
+      "option_names": [
+        {
+          "name": "ENV_VAR_SECURITY_PASSWORD",
+          "kind": "env"
+        },
+        {
+          "name": "env.var.security.password",
+          "kind": "conf"
+        }
+      ],
+      "datatype": {
+        "type": "string",
+        "unit": "password"
+      },
+      "as_of_version": "0.5.0",
+      "depends_on": [
+        {
+          "option_names": [
+            {
+              "name": "ENV_VAR_SECURITY",
+              "kind": "env"
+            },
+            {
+              "name": "env.var.security",
+              "kind": "conf"
+            }
+          ],
+          "value": "true"
+        }
+      ],
+      "apply_mode": "restart"
     }
   ]
 }

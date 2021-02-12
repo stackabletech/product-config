@@ -128,6 +128,11 @@ use std::fmt::Display;
 
 pub type Result<T> = std::result::Result<T, error::Error>;
 
+pub enum ValidationResult {
+    Ok,
+    Invalid(Vec<error::Error>),
+}
+
 #[derive(Debug)]
 pub struct Config {
     // provided config units with corresponding regex pattern
@@ -217,7 +222,7 @@ impl Config {
         option_name: &str,
         option_value: &str,
     ) -> Result<String> {
-        // a missing/wrong config options stops us from doing any other validation
+        // a missing/wrong config option stops us from doing any other validation
         if !self.config_options.contains_key(option_name) {
             return Err(Error::ConfigOptionNotFound {
                 option_name: option_name.to_string(),
@@ -375,7 +380,7 @@ impl Config {
     where
         T: FromStr + std::cmp::PartialOrd + Display + Copy,
     {
-        // no config value available
+        // TODO: no config value available -> can be desired behavior
         if option_value.is_empty() {
             return Err(Error::ConfigValueMissing {
                 option_name: option_name.to_string(),
@@ -433,7 +438,7 @@ impl Config {
         max: &Option<String>,
         unit: &Option<String>,
     ) -> Result<String> {
-        // no config value available
+        // TODO: no config value available -> can be desired behavior
         if option_value.is_empty() {
             return Err(Error::ConfigValueMissing {
                 option_name: option_name.to_string(),
@@ -587,7 +592,7 @@ pub enum Datatype {
 /// e.g. to set ssl certificates one has to set some property use_ssl to true
 #[derive(Deserialize, Clone, Debug)]
 struct Dependency {
-    option_name: OptionName,
+    option_names: Vec<OptionName>,
     value: Option<String>,
 }
 
