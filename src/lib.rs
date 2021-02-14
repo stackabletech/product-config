@@ -12,7 +12,7 @@
 //! The product config is build from e.g. a JSON file like in the example below:
 //! - The whole example is defined as ConfigItem and is split into config_settings and config_options
 //!   * config_settings contains additional information (e.g. like unit and respective regex patterns)
-//!   * config_options contains all the possible configuration options with all the know how for validation
+//!   * config_options contains all the possible configuration options including all the know how for validation
 //!
 //! # Example
 //! {
@@ -128,9 +128,9 @@ use std::fmt::Display;
 
 pub type Result<T> = std::result::Result<T, error::Error>;
 
-pub enum ValidationResult {
+pub enum Validation {
     Ok,
-    Invalid(Vec<error::Error>),
+    Invalid { reasons: Vec<error::Error> },
 }
 
 #[derive(Debug)]
@@ -210,7 +210,7 @@ impl Config {
     ///
     /// * `product_version` - version of the currently active product version
     /// * `option_name` - name of the config option (config property or environmental variable)
-    /// * `option_value` - config option value to be validated
+    /// * `option_value` - config option value to be validated; Option.None means missing, Option<""> will avoid some checks and set option to empty
     ///
     /// # Examples
     ///
@@ -220,9 +220,9 @@ impl Config {
         &self,
         product_version: &str,
         option_name: &str,
-        option_value: &str,
+        option_value: Option<&str>,
     ) -> Result<String> {
-        // a missing/wrong config option stops us from doing any other validation
+        // a missing / wrong config option stops us from doing any other validation
         if !self.config_options.contains_key(option_name) {
             return Err(Error::ConfigOptionNotFound {
                 option_name: option_name.to_string(),
@@ -231,6 +231,17 @@ impl Config {
 
         let option = self.config_options.get(option_name).unwrap();
 
+        let value = match option_value {
+            None => {
+                // value missing is just an error
+                return Err(Error::ConfigValueMissing {
+                    option_name: option_name.to_string(),
+                });
+            }
+            Some(val) => val,
+        };
+
+        // checks for config option
         self.check_version_supported_or_deprecated(
             option_name,
             product_version,
@@ -238,11 +249,33 @@ impl Config {
             &option.deprecated_since,
         )?;
 
-        self.check_datatype(option_name, option_value, &option.datatype)?;
+        // for an empty value (""), ignore checks for the value (check_datatype, check_allowed_values..)
+        if !value.is_empty() {
+            self.check_datatype(option_name, value, &option.datatype)?;
+            self.check_allowed_values(option_name, value, &option.allowed_values)?;
+        }
 
-        self.check_allowed_values(option_name, option_value, &option.allowed_values)?;
+        Ok(value.to_string())
+    }
 
-        Ok(option_value.to_string())
+    pub fn validate_all(
+        &self,
+        product_version: &str,
+        options: &HashMap<String, String>,
+    ) -> Result<()> {
+        for (option_name, option_value) in options {
+            // single option validation
+            self.validate(
+                product_version,
+                option_name.as_str(),
+                Some(option_value.as_str()),
+            )?;
+        }
+
+        // additional dependency validation
+        self.check_dependencies(&options)?;
+
+        Ok(())
     }
 
     /// Check if config option version is supported or deprecated regarding the product version
@@ -273,17 +306,18 @@ impl Config {
         }
 
         // check if requested config option is deprecated
-        if deprecated_since.is_some() {
-            let deprecated_since = Version::parse(deprecated_since.as_ref().unwrap())?;
+        if let Some(deprecated) = deprecated_since {
+            let deprecated_since_version = Version::parse(deprecated.as_ref())?;
 
-            if deprecated_since <= product_version {
+            if deprecated_since_version <= product_version {
                 return Err(Error::VersionDeprecated {
                     option_name: option_name.to_string(),
                     product_version: product_version.to_string(),
-                    deprecated_version: deprecated_since.to_string(),
+                    deprecated_version: deprecated_since_version.to_string(),
                 });
             }
         }
+
         Ok(())
     }
 
@@ -347,20 +381,6 @@ impl Config {
         Ok(())
     }
 
-    fn min_bound<T>(val: T, min: T) -> bool
-    where
-        T: FromStr + std::cmp::PartialOrd + Display + Copy,
-    {
-        val < min
-    }
-
-    fn max_bound<T>(val: T, min: T) -> bool
-    where
-        T: FromStr + std::cmp::PartialOrd + Display + Copy,
-    {
-        val > min
-    }
-
     /// Returns the provided scalar parameter value of type T (i16, i32, i64, f32, f62-..) if no parsing errors appear
     ///
     /// # Arguments
@@ -397,19 +417,36 @@ impl Config {
         Ok(val)
     }
 
+    /// Check if value is out of min bound
+    fn min_bound<T>(val: T, min: T) -> bool
+    where
+        T: FromStr + std::cmp::PartialOrd + Display + Copy,
+    {
+        val < min
+    }
+
+    /// Check if value is out of max bound
+    fn max_bound<T>(val: T, min: T) -> bool
+    where
+        T: FromStr + std::cmp::PartialOrd + Display + Copy,
+    {
+        val > min
+    }
+
+    /// Check if a value is inside a certain bound
     fn check_bound<T>(
         &self,
         option_name: &str,
         value: T,
         bound: &Option<String>,
-        check: fn(T, T) -> bool,
+        check_out_of_bound: fn(T, T) -> bool,
     ) -> Result<T>
     where
         T: FromStr + std::cmp::PartialOrd + Display + Copy,
     {
-        if bound.is_some() {
-            let bound: T = self.parse::<T>(option_name, bound.as_ref().unwrap().as_str())?;
-            if check(value, bound) {
+        if let Some(bound) = bound {
+            let bound: T = self.parse::<T>(option_name, bound.as_str())?;
+            if check_out_of_bound(value, bound) {
                 return Err(Error::ConfigValueOutOfBounds {
                     option_name: option_name.to_string(),
                     received: value.to_string(),
@@ -417,6 +454,7 @@ impl Config {
                 });
             }
         }
+
         Ok(value)
     }
 
@@ -447,9 +485,9 @@ impl Config {
         // len of config_value
         let len: usize = option_value.len();
         // check min bound
-        self.check_bound::<usize>(option_name, len, min, Config::min_bound);
+        self.check_bound::<usize>(option_name, len, min, Config::min_bound)?;
         // check max bound
-        self.check_bound::<usize>(option_name, len, max, Config::max_bound);
+        self.check_bound::<usize>(option_name, len, max, Config::max_bound)?;
 
         // check unit and respective regex
         if unit.is_none() {
@@ -479,6 +517,49 @@ impl Config {
         Ok(option_value.to_string())
     }
 
+    /// Check whether options have provided dependencies and if they are contained / set in the options map
+    ///
+    /// # Arguments
+    ///
+    /// * `options` - Map with config_option names and config_option values
+    ///
+    fn check_dependencies(&self, options: &HashMap<String, String>) -> Result<()> {
+        for (option_name, option_value) in options {
+            if let Some(option) = self.config_options.get(option_name) {
+                if let Some(dependencies) = &option.depends_on {
+                    for dependency in dependencies {
+                        for dependency_option in &dependency.option_names {
+                            // check if dependency name is include in optiions
+                            match options.get(&dependency_option.name) {
+                                None => {
+                                    return Err(Error::ConfigDependencyMissing {
+                                        option_name: option_name.clone(),
+                                        dependency: dependency_option.name.clone(),
+                                    });
+                                }
+                                Some(dependency_option_value) => {
+                                    // if required value provided check value as well
+                                    if let Some(value) = &dependency.value {
+                                        if value != dependency_option_value {
+                                            return Err(Error::ConfigDependencyValueInvalid {
+                                                option_name: option_name.clone(),
+                                                dependency: dependency_option.name.clone(),
+                                                option_value: option_value.clone(),
+                                                required_value: value.clone(),
+                                            });
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Parse a value to a certain datatype and throw error if parsing not possible
     fn parse<T: FromStr>(&self, option_name: &str, to_parse: &str) -> Result<T> {
         match to_parse.parse::<T>() {
             Ok(to_parse) => Ok(to_parse),
@@ -626,9 +707,18 @@ impl Default for ApplyMode {
 
 #[cfg(test)]
 mod tests {
+    macro_rules! hashmap {
+    ($( $key: expr => $val: expr ),*) => {{
+         let mut map = ::std::collections::HashMap::new();
+         $( map.insert($key, $val); )*
+         map
+    }}
+}
+
     use crate::reader::ConfigJsonReader;
     use crate::{Config, Error};
     use rstest::*;
+    use std::collections::HashMap;
 
     static ENV_VAR_INTEGER_PORT_MIN_MAX: &str = "ENV_VAR_INTEGER_PORT_MIN_MAX";
     static CONF_PROPERTY_STRING_MEMORY: &str = "conf.property.string.memory";
@@ -660,10 +750,10 @@ mod tests {
 
         // check allowed values
         case("0.5.0", ENV_VAR_ALLOWED_VALUES, "allowed_value1", Ok(String::from("allowed_value1"))),
-        case("0.5.0", ENV_VAR_ALLOWED_VALUES, "abc", Err(Error::ConfigValueNotInAllowedValues{ option_name: ENV_VAR_ALLOWED_VALUES.to_string(), value: "abc".to_string(), allowed_values: vec![String::from("allowed_value1"), String::from("allowed_value2"), String::from("allowed_value3")] }))
+        case("0.5.0", ENV_VAR_ALLOWED_VALUES, "abc", Err(Error::ConfigValueNotInAllowedValues{ option_name: ENV_VAR_ALLOWED_VALUES.to_string(), value: "abc".to_string(), allowed_values: vec![String::from("allowed_value1"), String::from("allowed_value2"), String::from("allowed_value3")] })),
         ::trace
     )]
-    fn test_data_format(
+    fn test_validate(
         product_version: &str,
         option_name: &str,
         option_value: &str,
@@ -671,7 +761,54 @@ mod tests {
     ) {
         let reader = ConfigJsonReader::new("data/test_config.json".to_string());
         let config = Config::new(reader).unwrap();
-        let result = config.validate(product_version, option_name, option_value);
+        let result = config.validate(product_version, option_name, Some(option_value));
+        assert_eq!(result, expected)
+    }
+
+    const ENV_SSL_CERTIFICATE_PATH: &str = "ENV_SSL_CERTIFICATE_PATH";
+    const ENV_SSL_ENABLED: &str = "ENV_SSL_ENABLED";
+    const PATH_TO_CERTIFICATE: &str = "some/path/to/certificate";
+
+    #[rstest(
+        product_version,
+        options,
+        expected,
+        // missing dependency
+        case(
+            "1.0.0",
+            hashmap!{
+                ENV_SSL_CERTIFICATE_PATH.to_string() => "some/path/to/certificate".to_string()
+            },
+            Err(Error::ConfigDependencyMissing { option_name: ENV_SSL_CERTIFICATE_PATH.to_string(), dependency: "ENV_SSL_ENABLED".to_string() })
+        ),
+        // correct dependency
+        case(
+            "1.0.0",
+            hashmap!{
+                ENV_SSL_CERTIFICATE_PATH.to_string() => "some/path/to/certificate".to_string(),
+                ENV_SSL_ENABLED.to_string() => "true".to_string()
+            },
+            Ok(())
+        ),
+        // correct dependency, wrong value
+        case(
+            "1.0.0",
+            hashmap!{
+                ENV_SSL_CERTIFICATE_PATH.to_string() => "some/path/to/certificate".to_string(),
+                ENV_SSL_ENABLED.to_string() => "false".to_string()
+            },
+            Err(Error::ConfigDependencyValueInvalid { option_name: ENV_SSL_CERTIFICATE_PATH.to_string(), dependency: ENV_SSL_ENABLED.to_string(), option_value: PATH_TO_CERTIFICATE.to_string(), required_value: "true".to_string() })
+        ),
+        ::trace
+    )]
+    fn test_validate_all(
+        product_version: &str,
+        options: HashMap<String, String>,
+        expected: Result<(), Error>,
+    ) {
+        let reader = ConfigJsonReader::new("data/test_config.json".to_string());
+        let config = Config::new(reader).unwrap();
+        let result = config.validate_all(product_version, &options);
         assert_eq!(result, expected)
     }
 }

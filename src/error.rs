@@ -15,14 +15,14 @@ pub enum Error {
         source: semver::SemVerError,
     },
 
-    #[error("[{option_name}]: current controller version is [{product_version}] -> option not supported; available from version [{required_version}]")]
+    #[error("[{option_name}]: current controller version is '{product_version}' -> option not supported; available from version '{required_version}'")]
     VersionNotSupported {
         option_name: String,
         product_version: String,
         required_version: String,
     },
 
-    #[error("[{option_name}]: current controller version is [{product_version}] -> option deprecated since version [{deprecated_version}]")]
+    #[error("[{option_name}]: current controller version is '{product_version}' -> option deprecated since version '{deprecated_version}'")]
     VersionDeprecated {
         option_name: String,
         product_version: String,
@@ -67,7 +67,7 @@ pub enum Error {
     #[error("empty regex pattern for unit '{unit}'")]
     EmptyRegexPattern { unit: String },
 
-    #[error("invalid regex pattern for unit '{unit}': {regex}")]
+    #[error("invalid regex pattern for unit '{unit}': '{regex}'")]
     InvalidRegexPattern { unit: String, regex: String },
 
     #[error("[{option_name}]: unit not provided")]
@@ -75,4 +75,19 @@ pub enum Error {
 
     #[error("[{option_name}]: unit '{unit}' not found in settings")]
     UnitSettingNotFound { option_name: String, unit: String },
+
+    // dependency
+    #[error("[{option_name}]: required dependency not provided: '{}'")]
+    ConfigDependencyMissing {
+        option_name: String,
+        dependency: String,
+    },
+
+    #[error("[{option_name}]: provided value '{option_value} does not match required value '{}' for dependency '{}'")]
+    ConfigDependencyValueInvalid {
+        option_name: String,
+        dependency: String,
+        option_value: String,
+        required_value: String,
+    },
 }

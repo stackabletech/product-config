@@ -199,6 +199,48 @@
         }
       ],
       "apply_mode": "restart"
+    },
+    {
+      "option_names": [
+        {
+          "name": "ENV_SSL_ENABLED",
+          "kind": "env"
+        }
+      ],
+      "datatype": {
+        "type": "bool"
+      },
+      "default_value": [
+        {
+          "from_version": "0.5.0",
+          "value": "false"
+        }
+      ],
+      "as_of_version": "0.5.0"
+    },
+    {
+      "option_names": [
+        {
+          "name": "ENV_SSL_CERTIFICATE_PATH",
+          "kind": "env"
+        }
+      ],
+      "datatype": {
+        "type": "string",
+        "unit": "directory"
+      },
+      "as_of_version": "0.5.0",
+      "depends_on": [
+        {
+          "option_names": [
+            {
+              "name": "ENV_SSL_ENABLED",
+              "kind": "env"
+            }
+          ],
+          "value": "true"
+        }
+      ]
     }
   ]
 }

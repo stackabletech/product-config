@@ -37,14 +37,12 @@ impl<T: DeserializeOwned> ConfigReader<T> for ConfigJsonReader {
         };
 
         let reader = BufReader::new(file);
-        return match serde_json::from_reader(reader) {
+        match serde_json::from_reader(reader) {
             Ok(t) => Ok(t),
-            Err(err) => {
-                return Err(Error::FileNotParsable {
-                    file_name: self.path.to_string(),
-                    reason: err.to_string(),
-                });
-            }
-        };
+            Err(err) => Err(Error::FileNotParsable {
+                file_name: self.path.to_string(),
+                reason: err.to_string(),
+            }),
+        }
     }
 }
