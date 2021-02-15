@@ -1,3 +1,5 @@
+use crate::OptionName;
+
 /// error definitions
 #[derive(PartialEq, thiserror::Error, Debug)]
 pub enum Error {
@@ -17,14 +19,14 @@ pub enum Error {
 
     #[error("[{option_name}]: current controller version is '{product_version}' -> option not supported; available from version '{required_version}'")]
     VersionNotSupported {
-        option_name: String,
+        option_name: OptionName,
         product_version: String,
         required_version: String,
     },
 
     #[error("[{option_name}]: current controller version is '{product_version}' -> option deprecated since version '{deprecated_version}'")]
     VersionDeprecated {
-        option_name: String,
+        option_name: OptionName,
         product_version: String,
         deprecated_version: String,
     },
@@ -34,21 +36,21 @@ pub enum Error {
     ConfigSettingNotFound { name: String },
 
     #[error("no config option found that matches '{option_name}'")]
-    ConfigOptionNotFound { option_name: String },
+    ConfigOptionNotFound { option_name: OptionName },
 
     #[error("[{0}]: provided value '{received}' violates min/max bound '{expected}'")]
     ConfigValueOutOfBounds {
-        option_name: String,
+        option_name: OptionName,
         received: String,
         expected: String,
     },
 
     #[error("[{option_name}]: provided config value missing")]
-    ConfigValueMissing { option_name: String },
+    ConfigValueMissing { option_name: OptionName },
 
     #[error("[{option_name}]: value '{value}' not in allowed values: {allowed_values:?}")]
     ConfigValueNotInAllowedValues {
-        option_name: String,
+        option_name: OptionName,
         value: String,
         allowed_values: Vec<String>,
     },
@@ -56,13 +58,16 @@ pub enum Error {
     // parsing
     #[error("[{option_name}]: value '{value}' not of specified type: '{datatype}'")]
     DatatypeNotMatching {
-        option_name: String,
+        option_name: OptionName,
         value: String,
         datatype: String,
     },
 
     #[error("[{option_name}]: value '{value}' does not match regex")]
-    DatatypeRegexNotMatching { option_name: String, value: String },
+    DatatypeRegexNotMatching {
+        option_name: OptionName,
+        value: String,
+    },
 
     #[error("empty regex pattern for unit '{unit}'")]
     EmptyRegexPattern { unit: String },
@@ -71,21 +76,24 @@ pub enum Error {
     InvalidRegexPattern { unit: String, regex: String },
 
     #[error("[{option_name}]: unit not provided")]
-    UnitNotProvided { option_name: String },
+    UnitNotProvided { option_name: OptionName },
 
     #[error("[{option_name}]: unit '{unit}' not found in settings")]
-    UnitSettingNotFound { option_name: String, unit: String },
+    UnitSettingNotFound {
+        option_name: OptionName,
+        unit: String,
+    },
 
     // dependency
     #[error("[{option_name}]: required dependency not provided: '{}'")]
     ConfigDependencyMissing {
-        option_name: String,
+        option_name: OptionName,
         dependency: String,
     },
 
     #[error("[{option_name}]: provided value '{option_value} does not match required value '{}' for dependency '{}'")]
     ConfigDependencyValueInvalid {
-        option_name: String,
+        option_name: OptionName,
         dependency: String,
         option_value: String,
         required_value: String,

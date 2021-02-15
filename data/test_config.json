@@ -71,7 +71,7 @@
           "kind": "env"
         },
         {
-          "name": "env.var.integer.port.min.max",
+          "name": "conf.var.integer.port.min.max",
           "kind": "conf"
         }
       ],
@@ -86,7 +86,7 @@
     {
       "option_names": [
         {
-          "name": "CONF_PROPERTY_STRING_MEMORY",
+          "name": "ENV_PROPERTY_STRING_MEMORY",
           "kind": "env"
         },
         {
@@ -104,7 +104,7 @@
     {
       "option_names": [
         {
-          "name": "CONF_PROPERTY_STRING_DEPRECATED",
+          "name": "ENV_PROPERTY_STRING_DEPRECATED",
           "kind": "env"
         },
         {
@@ -127,7 +127,7 @@
           "kind": "env"
         },
         {
-          "name": "env.var.allowed.values",
+          "name": "conf.var.allowed.values",
           "kind": "conf"
         }
       ],
@@ -151,7 +151,7 @@
           "kind": "env"
         },
         {
-          "name": "env.var.security",
+          "name": "conf.var.security",
           "kind": "conf"
         }
       ],
@@ -174,7 +174,7 @@
           "kind": "env"
         },
         {
-          "name": "env.var.security.password",
+          "name": "conf.var.security.password",
           "kind": "conf"
         }
       ],
@@ -191,7 +191,7 @@
               "kind": "env"
             },
             {
-              "name": "env.var.security",
+              "name": "conf.var.security",
               "kind": "conf"
             }
           ],
@@ -205,6 +205,10 @@
         {
           "name": "ENV_SSL_ENABLED",
           "kind": "env"
+        },
+        {
+          "name": "conf.ssl.enabled",
+          "kind": "conf"
         }
       ],
       "datatype": {
@@ -223,6 +227,10 @@
         {
           "name": "ENV_SSL_CERTIFICATE_PATH",
           "kind": "env"
+        },
+        {
+          "name": "conf.ssl.certificate.path",
+          "kind": "conf"
         }
       ],
       "datatype": {
@@ -236,6 +244,10 @@
             {
               "name": "ENV_SSL_ENABLED",
               "kind": "env"
+            },
+            {
+              "name": "conf.ssl.enabled",
+              "kind": "conf"
             }
           ],
           "value": "true"
