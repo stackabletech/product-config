@@ -85,13 +85,13 @@ pub enum Error {
     },
 
     // dependency
-    #[error("[{option_name}]: required dependency not provided: '{}'")]
+    #[error("[{option_name}]: required dependency not provided: '{dependency}'")]
     ConfigDependencyMissing {
         option_name: OptionName,
         dependency: String,
     },
 
-    #[error("[{option_name}]: provided value '{option_value} does not match required value '{}' for dependency '{}'")]
+    #[error("[{option_name}]: provided value '{option_value} does not match required value '{required_value}' for dependency '{dependency}'")]
     ConfigDependencyValueInvalid {
         option_name: OptionName,
         dependency: String,

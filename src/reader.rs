@@ -19,13 +19,14 @@ pub struct ConfigJsonReader {
 }
 
 impl ConfigJsonReader {
-    pub fn new(path: String) -> Self {
-        ConfigJsonReader { path }
+    pub fn new(path: &str) -> Self {
+        ConfigJsonReader {
+            path: path.to_string(),
+        }
     }
 }
 
 impl<T: DeserializeOwned> ConfigReader<T> for ConfigJsonReader {
-    /// specific json config reader "read" implementation
     fn read(&self) -> Result<T, Error> {
         let file = match File::open(self.path.as_str()) {
             Ok(file) => file,

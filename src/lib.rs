@@ -126,7 +126,7 @@ use regex::Regex;
 use semver::Version;
 use std::fmt::Display;
 
-pub type Result<T> = std::result::Result<T, error::Error>;
+pub type ConfigResult<T> = std::result::Result<T, error::Error>;
 
 #[derive(Debug)]
 pub struct Config {
@@ -147,7 +147,7 @@ impl Config {
     ///
     /// ```
     /// ```
-    pub fn new<CR: ConfigReader<ConfigItem>>(config_reader: CR) -> Result<Self> {
+    pub fn new<CR: ConfigReader<ConfigItem>>(config_reader: CR) -> ConfigResult<Self> {
         let root = config_reader.read()?;
 
         let mut config_options_map: HashMap<OptionName, ConfigOption> = HashMap::new();
@@ -217,7 +217,7 @@ impl Config {
         option_kind: &OptionKind,
         option_name: &str,
         option_value: Option<&str>,
-    ) -> Result<String> {
+    ) -> ConfigResult<String> {
         let config_option_name = OptionName {
             name: option_name.to_string(),
             kind: option_kind.clone(),
@@ -263,7 +263,7 @@ impl Config {
         &self,
         product_version: &str,
         options: &HashMap<OptionName, Option<String>>,
-    ) -> Result<()> {
+    ) -> ConfigResult<()> {
         for (option, option_value) in options {
             // single option validation
             self.validate(
@@ -294,7 +294,7 @@ impl Config {
         product_version: &str,
         option_version: &str,
         deprecated_since: &Option<String>,
-    ) -> Result<()> {
+    ) -> ConfigResult<()> {
         let product_version = Version::parse(product_version)?;
         let option_version = Version::parse(option_version)?;
 
@@ -335,7 +335,7 @@ impl Config {
         option_name: &OptionName,
         option_value: &str,
         datatype: &Datatype,
-    ) -> Result<()> {
+    ) -> ConfigResult<()> {
         // check datatype: datatype matching? min / max bounds?
         match datatype {
             Datatype::Bool => {
@@ -369,7 +369,7 @@ impl Config {
         option_name: &OptionName,
         option_value: &str,
         allowed_values: &Option<Vec<String>>,
-    ) -> Result<()> {
+    ) -> ConfigResult<()> {
         if allowed_values.is_some() {
             let allowed_values = allowed_values.clone().unwrap();
             if !allowed_values.is_empty() && !allowed_values.contains(&option_value.to_string()) {
@@ -398,7 +398,7 @@ impl Config {
         option_value: &str,
         min: &Option<String>,
         max: &Option<String>,
-    ) -> Result<T>
+    ) -> ConfigResult<T>
     where
         T: FromStr + std::cmp::PartialOrd + Display + Copy,
     {
@@ -435,7 +435,7 @@ impl Config {
         value: T,
         bound: &Option<String>,
         check_out_of_bound: fn(T, T) -> bool,
-    ) -> Result<T>
+    ) -> ConfigResult<T>
     where
         T: FromStr + std::cmp::PartialOrd + Display + Copy,
     {
@@ -470,7 +470,7 @@ impl Config {
         min: &Option<String>,
         max: &Option<String>,
         unit: &Option<String>,
-    ) -> Result<String> {
+    ) -> ConfigResult<String> {
         let len: usize = option_value.len();
         self.check_bound::<usize>(option_name, len, min, Config::min_bound)?;
         self.check_bound::<usize>(option_name, len, max, Config::max_bound)?;
@@ -507,7 +507,10 @@ impl Config {
     ///
     /// * `options` - Map with config_option names and config_option values
     ///
-    fn check_dependencies(&self, user_options: &HashMap<OptionName, Option<String>>) -> Result<()> {
+    fn check_dependencies(
+        &self,
+        user_options: &HashMap<OptionName, Option<String>>,
+    ) -> ConfigResult<()> {
         for option_name in user_options.keys() {
             // check if provided option_name has dependencies in config
             let dependencies = match self.config_options.get(option_name) {
@@ -554,7 +557,7 @@ impl Config {
     }
 
     /// Parse a value to a certain datatype and throw error if parsing not possible
-    fn parse<T: FromStr>(&self, option_name: &OptionName, to_parse: &str) -> Result<T> {
+    fn parse<T: FromStr>(&self, option_name: &OptionName, to_parse: &str) -> ConfigResult<T> {
         match to_parse.parse::<T>() {
             Ok(to_parse) => Ok(to_parse),
             Err(_) => {
@@ -841,7 +844,7 @@ mod tests {
         option_value: Option<&str>,
         expected: Result<String, Error>,
     ) {
-        let reader = ConfigJsonReader::new("data/test_config.json".to_string());
+        let reader = ConfigJsonReader::new("data/test_config.json");
         let config = Config::new(reader).unwrap();
         let result = config.validate(product_version, &option.kind, &option.name, option_value);
         assert_eq!(result, expected)
@@ -888,7 +891,7 @@ mod tests {
         options: HashMap<OptionName, Option<String>>,
         expected: Result<(), Error>,
     ) {
-        let reader = ConfigJsonReader::new("data/test_config.json".to_string());
+        let reader = ConfigJsonReader::new("data/test_config.json");
         let config = Config::new(reader).unwrap();
         let result = config.validate_all(product_version, &options);
         assert_eq!(result, expected)
