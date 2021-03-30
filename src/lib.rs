@@ -63,25 +63,15 @@ impl ProductConfig {
         config_kind: &OptionKind,
         config_file: &str,
         config_role: Option<&str>,
-        user_config_data: &HashMap<String, Option<String>>,
+        user_config: &HashMap<String, Option<String>>,
     ) -> HashMap<String, ProductConfigResult> {
-        let mut config = HashMap::new();
+        let mut result_config = HashMap::new();
 
         // collect all available options (user and config)
-        let mut all_options = HashMap::new();
+        let merged_config_options =
+            self.merge_config_options(user_config, product_version, config_file, config_role);
 
-        if let Ok(options) = util::filter_config_options(
-            &self.config_options,
-            config_file,
-            config_role,
-            product_version,
-        ) {
-            all_options.extend(options)
-        }
-
-        all_options.extend(user_config_data.clone());
-
-        for (name, value) in all_options {
+        for (name, value) in merged_config_options {
             //let mut result;
             let option_name = &OptionName {
                 name: name.clone(),
@@ -89,7 +79,7 @@ impl ProductConfig {
                 config_file: config_file.to_string(),
             };
 
-            config.insert(
+            result_config.insert(
                 option_name.name.clone(),
                 validation::validate(
                     &self.config_options,
@@ -100,11 +90,30 @@ impl ProductConfig {
                 ),
             );
         }
-        // check existing options
+        result_config
+    }
 
-        // add remaining required options
+    fn merge_config_options(
+        &self,
+        user_config: &HashMap<String, Option<String>>,
+        product_version: &str,
+        config_file: &str,
+        config_role: Option<&str>,
+    ) -> HashMap<String, Option<String>> {
+        let mut merged_config_options = HashMap::new();
 
-        config
+        if let Ok(options) = util::filter_config_options(
+            &self.config_options,
+            config_file,
+            config_role,
+            product_version,
+        ) {
+            merged_config_options.extend(options)
+        }
+
+        merged_config_options.extend(user_config.clone());
+
+        merged_config_options
     }
 }
 

@@ -241,7 +241,6 @@ fn check_datatype(
     option_value: &str,
     datatype: &Datatype,
 ) -> ConfigValidationResult<()> {
-    // check datatype: datatype matching? min / max bounds?
     match datatype {
         Datatype::Bool => {
             check_datatype_scalar::<bool>(option_name, option_value, &None, &None)?;
@@ -422,4 +421,83 @@ fn parse<T: FromStr>(option_name: &OptionName, to_parse: &str) -> Result<T, Erro
             })
         }
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::error::Error;
+    use crate::types::{Datatype, OptionKind, OptionName};
+    use crate::validation::{check_datatype, check_version_supported_or_deprecated};
+    use rstest::*;
+
+    const NAME: &str = "test_name";
+    const CONFIG_VALUE: &str = "test.config";
+    const V_1_5_0: &str = "1.5.0";
+    const V_1_0_0: &str = "1.0.0";
+    const V_0_5_0: &str = "0.5.0";
+    const V_0_1_0: &str = "0.1.0";
+
+    fn get_option_name() -> OptionName {
+        OptionName {
+            name: NAME.to_string(),
+            kind: OptionKind::Conf,
+            config_file: CONFIG_VALUE.to_string(),
+        }
+    }
+
+    #[rstest(
+        option_name,
+        product_version,
+        option_version,
+        deprecated_since,
+        expected,
+        case(get_option_name(), V_1_0_0, V_0_5_0, None, Ok(())),
+        case(get_option_name(), V_0_1_0, V_1_0_0, Some(V_0_5_0.to_string()),
+            Err(Error::VersionNotSupported { option_name: option_name.clone(), product_version: V_0_1_0.to_string(), required_version: V_1_0_0.to_string() })),
+        case(get_option_name(), V_1_5_0, V_0_5_0, Some(V_1_0_0.to_string()),
+            Err(Error::VersionDeprecated { option_name: option_name.clone(), product_version: V_1_5_0.to_string(), deprecated_version: V_1_0_0.to_string() })),
+        ::trace
+    )]
+    fn test_check_version_supported_or_deprecated(
+        option_name: OptionName,
+        product_version: &str,
+        option_version: &str,
+        deprecated_since: Option<String>,
+        expected: Result<(), Error>,
+    ) {
+        let result = check_version_supported_or_deprecated(
+            &option_name,
+            product_version,
+            option_version,
+            &deprecated_since,
+        );
+
+        assert_eq!(result, expected)
+    }
+
+    // #[rstest(
+    //     config_setting_units,
+    //     option_name,
+    //     option_value,
+    //     datatype,
+    //     expected,
+    //     case(get_option_name(), V_1_0_0, V_0_5_0, None, Ok(())),
+    //     ::trace
+    // )]
+    // fn test_check_datatype(
+    //     config_setting_units: &HashMap<String, Regex>,
+    //     option_name: &OptionName,
+    //     option_value: &str,
+    //     datatype: &Datatype,
+    //     expected: Result<(), Error>,
+    // ) {
+    //     let result = check_datatype(
+    //         &option_name,
+    //         product_version,
+    //         option_version,
+    //         &deprecated_since,
+    //     );
+    //
+    //     assert_eq!(result, expected)
+    // }
 }
