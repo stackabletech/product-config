@@ -1,7 +1,7 @@
 use crate::OptionName;
 
 /// error definitions
-#[derive(PartialEq, thiserror::Error, Debug)]
+#[derive(thiserror::Error, Clone, Debug, PartialOrd, PartialEq)]
 pub enum Error {
     // reader
     #[error("file not found: {file_name}")]
