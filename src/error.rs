@@ -11,7 +11,7 @@ pub enum Error {
     FileNotParsable { file_name: String, reason: String },
 
     // version
-    #[error("invalid sem version: {source}")]
+    #[error("Invalid sem version: {source}")]
     InvalidVersion {
         #[from]
         source: semver::SemVerError,
@@ -32,11 +32,20 @@ pub enum Error {
     },
 
     // config
-    #[error("required config setting not found: '{name}'")]
+    #[error("Required config setting not found: '{name}'")]
     ConfigSettingNotFound { name: String },
 
-    #[error("no config option found that matches '{option_name}'")]
+    #[error("No config option found that matches '{option_name}'")]
     ConfigOptionNotFound { option_name: OptionName },
+
+    #[error("No roles in '{name}' match the provided role: '{role}'")]
+    ConfigOptionRoleNotFound { name: OptionName, role: String },
+
+    #[error("No roles in provided for '{name}' ")]
+    ConfigOptionRoleNotProvided { name: OptionName },
+
+    #[error("No role was provided by user for '{name}' ")]
+    ConfigOptionRoleNotProvidedByUser { name: OptionName },
 
     #[error("[{0}]: provided value '{received}' violates min/max bound '{expected}'")]
     ConfigValueOutOfBounds {
@@ -69,10 +78,10 @@ pub enum Error {
         value: String,
     },
 
-    #[error("empty regex pattern for unit '{unit}'")]
+    #[error("Empty regex pattern for unit '{unit}'")]
     EmptyRegexPattern { unit: String },
 
-    #[error("invalid regex pattern for unit '{unit}': '{regex}'")]
+    #[error("Invalid regex pattern for unit '{unit}': '{regex}'")]
     InvalidRegexPattern { unit: String, regex: String },
 
     #[error("[{option_name}]: unit not provided")]
@@ -91,11 +100,31 @@ pub enum Error {
         dependency: String,
     },
 
-    #[error("[{option_name}]: provided value '{option_value} does not match required value '{required_value}' for dependency '{dependency}'")]
+    #[error(
+        "[{option_name}]: dependency '{dependency}' requires no values, but was set to '{user_value}'"
+    )]
+    ConfigDependencyValueMissing {
+        option_name: OptionName,
+        dependency: String,
+        user_value: String,
+    },
+
+    #[error(
+    "[{option_name}]: dependency '{dependency}' requires value missing value '{required_value}' to be set"
+    )]
+    ConfigDependencyUserValueMissing {
+        option_name: OptionName,
+        dependency: String,
+        required_value: String,
+    },
+
+    #[error(
+        "[{option_name}]: provided value '{user_value} does not match required value '{required_value}' for dependency '{dependency}'"
+    )]
     ConfigDependencyValueInvalid {
         option_name: OptionName,
         dependency: String,
-        option_value: String,
+        user_value: String,
         required_value: String,
     },
 }

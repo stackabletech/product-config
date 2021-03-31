@@ -168,7 +168,6 @@
           "required": true
         }
       ],
-      "allowed_values": [],
       "as_of_version": "0.5.0"
     },
     {
@@ -211,6 +210,16 @@
           "value": "allowed_value1"
         }
       ],
+      "roles": [
+        {
+          "name": "role_1",
+          "required": false
+        },
+        {
+          "name": "role_2",
+          "required": true
+        }
+      ],
       "datatype": {
         "type": "string",
         "max": "255",
@@ -243,6 +252,16 @@
         {
           "from_version": "0.5.0",
           "value": "false"
+        }
+      ],
+      "roles": [
+        {
+          "name": "role_1",
+          "required": false
+        },
+        {
+          "name": "role_2",
+          "required": true
         }
       ],
       "as_of_version": "0.5.0",
@@ -298,6 +317,16 @@
           "config_file": "my.config"
         }
       ],
+      "roles": [
+        {
+          "name": "role_1",
+          "required": false
+        },
+        {
+          "name": "role_2",
+          "required": true
+        }
+      ],
       "datatype": {
         "type": "bool"
       },
@@ -320,6 +349,16 @@
           "name": "conf.ssl.certificate.path",
           "kind": "conf",
           "config_file": "my.config"
+        }
+      ],
+      "roles": [
+        {
+          "name": "role_1",
+          "required": true
+        },
+        {
+          "name": "role_2",
+          "required": true
         }
       ],
       "datatype": {

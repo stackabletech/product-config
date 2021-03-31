@@ -16,6 +16,7 @@ pub fn filter_config_options(
         if option_name.config_file != config_file {
             continue;
         }
+
         // role exists and matches?
         // TODO: Right now not providing a role is ignored. Throw error?
         if let Some(role) = config_role {
@@ -24,6 +25,7 @@ pub fn filter_config_options(
             }
         }
 
+        // TODO: What if no recommended or default value provided?
         if let Some(recommended) = &config_option.recommended_values {
             let option_value = filter_option_value_for_version(recommended, option_name, version)?;
             config_file_options.insert(option_name.name.clone(), Some(option_value.value));

@@ -1,7 +1,7 @@
 //type ConfigValidatorResult<T> = std::result::Result<T, error::Error>;
 
 use crate::error::Error;
-use crate::types::{ConfigOption, Datatype, OptionName};
+use crate::types::{ConfigOption, Datatype, OptionName, Role};
 use crate::ProductConfigResult;
 use regex::Regex;
 use semver::Version;
@@ -26,7 +26,9 @@ type ConfigValidationResult<T> = Result<T, Error>;
 pub fn validate(
     config_options: &HashMap<OptionName, ConfigOption>,
     config_setting_units: &HashMap<String, Regex>,
+    merged_config_options: &HashMap<String, Option<String>>,
     product_version: &str,
+    config_role: Option<&str>,
     option_name: &OptionName,
     option_value: Option<String>,
 ) -> ProductConfigResult {
@@ -81,55 +83,58 @@ pub fn validate(
         }
     }
 
+    let check_dependencies = check_dependencies(option_name, config_option, &merged_config_options);
+    if check_dependencies.is_err() {
+        match check_dependencies.err() {
+            None => {}
+            Some(err) => match err {
+                Error::ConfigDependencyValueMissing { .. }
+                | Error::ConfigDependencyUserValueMissing { .. } => {
+                    return ProductConfigResult::Warn(value, err)
+                }
+                _ => return ProductConfigResult::Error(err),
+            },
+        }
+    }
+
+    let check_role = check_role(&config_option.roles, config_role, option_name);
+    if check_role.is_err() {
+        return ProductConfigResult::Warn(value, check_role.err().unwrap());
+    }
+
     ProductConfigResult::Valid(value)
 }
 
-// pub fn validate_all(
-//     config_options: &HashMap<OptionName, ConfigOption>,
-//     config_setting_units: &HashMap<String, Regex>,
-//     product_version: &str,
-//     options: &HashMap<OptionName, Option<String>>,
-// ) -> HashMap<OptionName, ProductConfigResult> {
-//     let mut result = HashMap::new();
-//     for (option_name, option_value) in options {
-//         // single option validation
-//         validate(
-//             config_options,
-//             config_setting_units,
-//             product_version,
-//             option_name,
-//             option_value.clone(),
-//         );
-//     }
-//
-//     // additional dependency validation
-//     check_dependencies(config_options, &options)?;
-//
-//     result
-// }
+fn check_role(
+    config_roles: &Option<Vec<Role>>,
+    config_role: Option<&str>,
+    option_name: &OptionName,
+) -> ConfigValidationResult<()> {
+    if config_roles.is_none() {
+        return Err(Error::ConfigOptionRoleNotProvided {
+            name: option_name.clone(),
+        });
+    }
 
-// /// Check if default or recommended values are available
-// /// Check their datatype and version match
-// /// Check if dependencies are available
-// fn check_config_options(config_options: &HashMap<OptionName, ConfigOption>) {
-//     // build local name -> value map where value is either default or recommended value
-//     let mut local_config: HashMap<String, String> = HashMap::new();
-//     for (option_name, config_option) in config_options {
-//         // check if there are values matching the version
-//         let version = &config_option.as_of_version;
-//
-//         if let Some(recommended) = &config_option.recommended_values {
-//             for value in recommended {
-//                 if let Some(from_version) = &value.from_version {
-//
-//                 }
-//             }
-//
-//
-//         } else if let Some(default) = &config_option.default_values {
-//         }
-//     }
-// }
+    if config_role.is_none() {
+        return Err(Error::ConfigOptionRoleNotProvidedByUser {
+            name: option_name.clone(),
+        });
+    }
+
+    if let (Some(roles), Some(user_role)) = (config_roles, config_role) {
+        for role in roles {
+            if role.name == user_role && role.required == true {
+                return Ok(());
+            }
+        }
+    }
+
+    Err(Error::ConfigOptionRoleNotFound {
+        name: option_name.clone(),
+        role: config_role.unwrap().to_string(),
+    })
+}
 
 /// Check if config option version is supported or deprecated regarding the product version
 /// # Arguments
@@ -177,49 +182,63 @@ fn check_version_supported_or_deprecated(
 ///
 /// # Arguments
 ///
-/// * `options` - Map with config_option names and config_option values
+/// * `config_options` - Map with config_option names and config_option values
 ///
 fn check_dependencies(
-    config_options: &HashMap<OptionName, ConfigOption>,
-    user_options: &HashMap<OptionName, Option<String>>,
+    option_name: &OptionName,
+    config_option: &ConfigOption,
+    user_options: &HashMap<String, Option<String>>,
 ) -> ConfigValidationResult<()> {
-    for option_name in user_options.keys() {
-        // check if provided option_name has dependencies in config
-        let dependencies = match config_options.get(option_name) {
-            None => continue,
-            Some(dep) => match &dep.depends_on {
-                None => continue,
-                Some(dependencies) => dependencies,
-            },
-        };
+    // check if config option has dependencies
+    let config_option_dependencies = match &config_option.depends_on {
+        None => return Ok(()),
+        Some(dependencies) => dependencies,
+    };
 
-        // for each dependency check names
-        for dependency in dependencies {
-            for dependency_name in &dependency.option_names {
-                // TODO: for now we search only for dependencies with the same kind (e.g. both env variables)
-                if dependency_name.kind != option_name.kind {
-                    continue;
-                }
-                // check if name is available in user options
-                if let Some(user_value) = user_options.get(&dependency_name) {
-                    // check if provided required values available
-                    if let (Some(user_value), Some(dependency_value)) =
-                        (user_value, &dependency.value)
-                    {
-                        if user_value != dependency_value {
-                            return Err(Error::ConfigDependencyValueInvalid {
-                                option_name: option_name.clone(),
-                                dependency: dependency_name.name.clone(),
-                                option_value: user_value.clone(),
-                                required_value: dependency_value.clone(),
-                            });
-                        }
-                    }
-                } else {
+    // for each dependency, check if user_options contains the config option and the correct value
+    for dependency in config_option_dependencies {
+        // for each option name provided within the dependency
+        for dependency_option in &dependency.option_names {
+            if !user_options.contains_key(&dependency_option.name) {
+                continue;
+            }
+
+            match user_options.get(&dependency_option.name) {
+                None => {
                     return Err(Error::ConfigDependencyMissing {
                         option_name: option_name.clone(),
-                        dependency: dependency_name.name.clone(),
+                        dependency: dependency_option.name.clone(),
                     });
+                }
+                Some(user_value) => {
+                    // a value is set for the dependency
+                    match (user_value, &dependency.value) {
+                        (None, Some(required_val)) => {
+                            return Err(Error::ConfigDependencyUserValueMissing {
+                                option_name: option_name.clone(),
+                                dependency: dependency_option.name.clone(),
+                                required_value: required_val.clone(),
+                            });
+                        }
+                        (Some(user_val), None) => {
+                            return Err(Error::ConfigDependencyValueMissing {
+                                option_name: option_name.clone(),
+                                dependency: dependency_option.name.clone(),
+                                user_value: user_val.clone(),
+                            });
+                        }
+                        (Some(user_val), Some(required_val)) => {
+                            if user_val != required_val {
+                                return Err(Error::ConfigDependencyValueInvalid {
+                                    option_name: option_name.clone(),
+                                    dependency: dependency_option.name.clone(),
+                                    user_value: user_val.clone(),
+                                    required_value: required_val.clone(),
+                                });
+                            }
+                        }
+                        (_, _) => {}
+                    }
                 }
             }
         }
@@ -426,8 +445,8 @@ fn parse<T: FromStr>(option_name: &OptionName, to_parse: &str) -> Result<T, Erro
 #[cfg(test)]
 mod tests {
     use crate::error::Error;
-    use crate::types::{Datatype, OptionKind, OptionName};
-    use crate::validation::{check_datatype, check_version_supported_or_deprecated};
+    use crate::types::{OptionKind, OptionName};
+    use crate::validation::check_version_supported_or_deprecated;
     use rstest::*;
 
     const NAME: &str = "test_name";

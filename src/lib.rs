@@ -19,7 +19,6 @@ pub mod reader;
 pub mod types;
 mod util;
 mod validation;
-pub mod warning;
 
 use std::collections::HashMap;
 use std::str;
@@ -28,7 +27,6 @@ use std::string::String;
 use crate::error::Error;
 use crate::reader::ConfigReader;
 use crate::types::{ConfigItem, ConfigOption, OptionKind, OptionName};
-use crate::warning::Warning;
 use regex::Regex;
 
 #[derive(Clone, Debug, PartialOrd, PartialEq)]
@@ -38,7 +36,7 @@ pub enum ProductConfigResult {
     Recommended(String),
     Valid(String),
     // On warn, continue with checks which eventually lead to a pure error
-    Warn(String, Warning),
+    Warn(String, Error),
     // On error immediately return / continue with other options
     Error(Error),
 }
@@ -71,7 +69,7 @@ impl ProductConfig {
         let merged_config_options =
             self.merge_config_options(user_config, product_version, config_file, config_role);
 
-        for (name, value) in merged_config_options {
+        for (name, value) in &merged_config_options {
             //let mut result;
             let option_name = &OptionName {
                 name: name.clone(),
@@ -84,7 +82,9 @@ impl ProductConfig {
                 validation::validate(
                     &self.config_options,
                     &self.config_setting_units,
+                    &merged_config_options,
                     product_version,
+                    config_role,
                     option_name,
                     value.clone(),
                 ),
@@ -172,7 +172,6 @@ mod tests {
     use crate::error::Error;
     use crate::reader::ConfigJsonReader;
     use crate::types::{OptionKind, OptionName};
-    use crate::warning::Warning;
     use crate::{ProductConfig, ProductConfigResult};
     use std::collections::HashMap;
 
@@ -190,12 +189,17 @@ mod tests {
             Some("1g".to_string()),
         );
 
+        test_data.insert(
+            "ENV_SSL_CERTIFICATE_PATH".to_string(),
+            Some("/tmp/ssl_key.xyz".to_string()),
+        );
+
         let temp = config.get(
             "0.5.0",
             &OptionKind::Env,
             //"env.sh",
             "env.sh",
-            Some("role_1"),
+            Some("role_2"),
             &test_data,
         );
 
@@ -212,8 +216,8 @@ mod tests {
         let recommended = ProductConfigResult::Recommended("recommended".to_string());
         let warn = ProductConfigResult::Warn(
             "warning".to_string(),
-            Warning::ConfigOptionRoleNotProvided {
-                name: OptionName {
+            Error::ConfigOptionNotFound {
+                option_name: OptionName {
                     name: "test".to_string(),
                     kind: OptionKind::Conf,
                     config_file: "my_config".to_string(),
