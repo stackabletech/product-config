@@ -317,16 +317,6 @@
           "config_file": "my.config"
         }
       ],
-      "roles": [
-        {
-          "name": "role_1",
-          "required": false
-        },
-        {
-          "name": "role_2",
-          "required": true
-        }
-      ],
       "datatype": {
         "type": "bool"
       },
@@ -334,6 +324,16 @@
         {
           "from_version": "0.5.0",
           "value": "false"
+        }
+      ],
+      "roles": [
+        {
+          "name": "role_1",
+          "required": true
+        },
+        {
+          "name": "role_2",
+          "required": true
         }
       ],
       "as_of_version": "0.5.0"

@@ -1,7 +1,8 @@
 //type ConfigValidatorResult<T> = std::result::Result<T, error::Error>;
 
 use crate::error::Error;
-use crate::types::{ConfigOption, Datatype, OptionName, Role};
+use crate::types::{ConfigOption, Datatype, OptionName, OptionValue, Role};
+use crate::util;
 use crate::ProductConfigResult;
 use regex::Regex;
 use semver::Version;
@@ -87,13 +88,15 @@ pub fn validate(
     if check_dependencies.is_err() {
         match check_dependencies.err() {
             None => {}
-            Some(err) => match err {
-                Error::ConfigDependencyValueMissing { .. }
-                | Error::ConfigDependencyUserValueMissing { .. } => {
-                    return ProductConfigResult::Warn(value, err)
+            Some(err) => {
+                return match err {
+                    Error::ConfigDependencyValueMissing { .. }
+                    | Error::ConfigDependencyUserValueMissing { .. } => {
+                        ProductConfigResult::Warn(value, err)
+                    }
+                    _ => ProductConfigResult::Error(err),
                 }
-                _ => return ProductConfigResult::Error(err),
-            },
+            }
         }
     }
 
@@ -102,7 +105,46 @@ pub fn validate(
         return ProductConfigResult::Warn(value, check_role.err().unwrap());
     }
 
+    // recommended
+    if Ok(true)
+        == check_option_value_used(
+            option_name,
+            value.as_str(),
+            &config_option.recommended_values,
+            product_version,
+        )
+    {
+        return ProductConfigResult::Recommended(value);
+    }
+    // default
+    if Ok(true)
+        == check_option_value_used(
+            option_name,
+            value.as_str(),
+            &config_option.default_values,
+            product_version,
+        )
+    {
+        return ProductConfigResult::Default(value);
+    }
+
     ProductConfigResult::Valid(value)
+}
+
+fn check_option_value_used(
+    option_name: &OptionName,
+    value: &str,
+    option_values: &Option<Vec<OptionValue>>,
+    version: &str,
+) -> ConfigValidationResult<bool> {
+    if let Some(values) = option_values {
+        let val = util::filter_option_value_for_version(values, option_name, version)?;
+        if val.value == value {
+            return Ok(true);
+        }
+    }
+
+    Ok(false)
 }
 
 fn check_role(
@@ -124,7 +166,7 @@ fn check_role(
 
     if let (Some(roles), Some(user_role)) = (config_roles, config_role) {
         for role in roles {
-            if role.name == user_role && role.required == true {
+            if role.name == user_role && role.required {
                 return Ok(());
             }
         }
