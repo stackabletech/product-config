@@ -55,6 +55,42 @@ impl ProductConfig {
         parse_config(&config)
     }
 
+    /// Retrieve and check config options depending on the kind (e.g. env, conf), the required config file
+    /// (e.g. environment variables or config properties). Add other provided options that match the
+    /// config kind, config file and config role. Automatically add and correct missing or wrong
+    /// config options and dependencies.
+    ///
+    /// # Arguments
+    ///
+    /// * `product_version` - the current product / controller version
+    /// * `config_kind` - config kind provided by the user -> relate to config_option.option_name.kind
+    /// * `config_file` - config file provided by the user -> relate to config_option.option_name.config_file
+    /// * `config_role` - config role provided by the user -> relate to config_option.roles
+    /// * `user_config` - map with option name and values (the explicit user config options)
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use product_config::reader::ConfigJsonReader;
+    /// use product_config::types::OptionKind;
+    /// use product_config::ProductConfig;
+    /// use std::collections::HashMap;
+    ///
+    /// let config = ProductConfig::new(ConfigJsonReader::new("data/test_config.json")).unwrap();
+    ///
+    /// let mut user_data = HashMap::new();
+    /// user_data.insert("ENV_VAR_INTEGER_PORT_MIN_MAX".to_string(), Some("12345".to_string()));
+    /// user_data.insert("ENV_PROPERTY_STRING_MEMORY".to_string(), Some("1g".to_string()));
+    ///
+    /// let env_sh = config.get(
+    ///     "0.5.0",
+    ///     &OptionKind::Env,
+    ///     "env.sh",
+    ///     Some("role_1"),
+    ///     &user_data,
+    /// );
+    /// ```
+    ///
     pub fn get(
         &self,
         product_version: &str,
@@ -93,6 +129,16 @@ impl ProductConfig {
         result_config
     }
 
+    /// Merge user config options and available config options depending on file and role to
+    /// be validated later.
+    ///
+    /// # Arguments
+    ///
+    /// * `user_config` - map with option name and values (the explicit user config options)
+    /// * `product_version` - the current product / controller version
+    /// * `config_file` - config file provided by the user -> relate to config_option.option_name.config_file
+    /// * `config_role` - config role provided by the user -> relate to config_option.roles
+    ///
     fn merge_config_options(
         &self,
         user_config: &HashMap<String, Option<String>>,
@@ -117,6 +163,12 @@ impl ProductConfig {
     }
 }
 
+/// Retrieve and check config options depending on the kind (e.g. env, conf), the required config file
+///
+/// # Arguments
+///
+/// * `config` - the current product / controller version
+///
 fn parse_config(config: &ConfigItem) -> Result<ProductConfig, Error> {
     let mut config_options: HashMap<OptionName, ConfigOption> = HashMap::new();
     // pack config item options via name into hashmap for access
