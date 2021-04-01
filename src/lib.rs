@@ -32,12 +32,19 @@ use regex::Regex;
 #[derive(Clone, Debug, PartialOrd, PartialEq)]
 #[repr(u8)]
 pub enum ProductConfigResult {
+    /// On Default, the value does not differ from the default settings and may be
+    /// left out from the user config in the future.
     Default(String),
+    /// On Recommended, the value from the recommended section depending
+    /// on the product version was used. Can be because of automatic enhancement,
+    /// matching config file and role etc.
     Recommended(String),
+    /// On Valid, the value passed all checks and can be used.
     Valid(String),
-    // On warn, continue with checks which eventually lead to a pure error
+    /// On warn, the value maybe used with caution.
     Warn(String, Error),
-    // On error immediately return / continue with other options
+    /// On error, check the provided config and config values.
+    /// Should never be used like this!
     Error(Error),
 }
 
@@ -50,6 +57,12 @@ pub struct ProductConfig {
 }
 
 impl ProductConfig {
+    /// Create a ProductConfig based on a config reader like e.g. JSON, YAML etc.
+    ///
+    /// # Arguments
+    ///
+    /// * `config_reader` - config_reader implementation
+    ///
     pub fn new<CR: ConfigReader<ConfigItem>>(config_reader: CR) -> Result<Self, Error> {
         let config = config_reader.read()?;
         parse_config(&config)
