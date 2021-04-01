@@ -100,12 +100,12 @@ pub fn validate(
         }
     }
 
-    let check_role = check_role(&config_option.roles, config_role, option_name);
+    let check_role = check_role(option_name, &config_option.roles, config_role);
     if check_role.is_err() {
         return ProductConfigResult::Warn(value, check_role.err().unwrap());
     }
 
-    // recommended
+    // was provided by recommended value?
     if Ok(true)
         == check_option_value_used(
             option_name,
@@ -116,7 +116,8 @@ pub fn validate(
     {
         return ProductConfigResult::Recommended(value);
     }
-    // default
+
+    // was provided by default value?
     if Ok(true)
         == check_option_value_used(
             option_name,
@@ -131,14 +132,23 @@ pub fn validate(
     ProductConfigResult::Valid(value)
 }
 
+/// Check if the final used value corresponds to e.g. recommended or default values
+///
+/// # Arguments
+///
+/// * `option_name` - name of the config option (config property or environmental variable)
+/// * `value` - the final value used
+/// * `option_values` - possible option names e.g. default or recommended values
+/// * `product_version` - the provided product version
+///
 fn check_option_value_used(
     option_name: &OptionName,
     value: &str,
     option_values: &Option<Vec<OptionValue>>,
-    version: &str,
+    product_version: &str,
 ) -> ConfigValidationResult<bool> {
     if let Some(values) = option_values {
-        let val = util::filter_option_value_for_version(values, option_name, version)?;
+        let val = util::filter_option_value_for_version(option_name, values, product_version)?;
         if val.value == value {
             return Ok(true);
         }
@@ -147,10 +157,18 @@ fn check_option_value_used(
     Ok(false)
 }
 
+/// Check if config option version is supported or deprecated regarding the product version
+///
+/// # Arguments
+///
+/// * `option_name` - name of the config option (config property or environmental variable)
+/// * `config_roles` - config roles provided in the option definition
+/// * `config_role` - config role provided by the user
+///
 fn check_role(
+    option_name: &OptionName,
     config_roles: &Option<Vec<Role>>,
     config_role: Option<&str>,
-    option_name: &OptionName,
 ) -> ConfigValidationResult<()> {
     if config_roles.is_none() {
         return Err(Error::ConfigOptionRoleNotProvided {
@@ -221,10 +239,13 @@ fn check_version_supported_or_deprecated(
 }
 
 /// Check whether options have provided dependencies and if they are contained / set in the options map
+/// TODO: add dependency automatically if missing?
 ///
 /// # Arguments
 ///
-/// * `config_options` - Map with config_option names and config_option values
+/// * `option_name` - name of the current option
+/// * `config_options` - map with (defined) config option names and the respective config_option
+/// * `user_options` - map with config option name and potential value provided by user
 ///
 fn check_dependencies(
     option_name: &OptionName,
@@ -292,9 +313,10 @@ fn check_dependencies(
 /// Check if option value fits the provided datatype
 /// # Arguments
 ///
+/// * `config_setting_units` - map with unit name and respective regular expression to evaluate the datatype
 /// * `option_name` - name of the config option (config property or environmental variable)
 /// * `option_value` - config option value to be validated
-/// * `datatype` - containing min/max bounds, units etc.
+/// * `datatype` - option datatype containing min/max bounds, units etc.
 ///
 fn check_datatype(
     config_setting_units: &HashMap<String, Regex>,
@@ -386,6 +408,7 @@ where
 ///
 /// # Arguments
 ///
+/// * `config_setting_units` - map with unit name and respective regular expression to evaluate the datatype
 /// * `option_name` - name of the config option (config property or environmental variable)
 /// * `option_value` - config option value to be validated
 /// * `min` - minimum value specified in config_option.data_format.min
@@ -431,6 +454,12 @@ fn check_datatype_string(
 }
 
 /// Check if value is out of min bound
+///
+/// # Arguments
+///
+/// * `val` - value to be validated
+/// * `min` - min border (exclusive)
+///
 fn min_bound<T>(val: T, min: T) -> bool
 where
     T: FromStr + std::cmp::PartialOrd + Display + Copy,
@@ -439,6 +468,12 @@ where
 }
 
 /// Check if value is out of max bound
+///
+/// # Arguments
+///
+/// * `val` - value to be validated
+/// * `max` - max border (exclusive)
+///
 fn max_bound<T>(val: T, min: T) -> bool
 where
     T: FromStr + std::cmp::PartialOrd + Display + Copy,
@@ -447,6 +482,14 @@ where
 }
 
 /// Check if a value is inside a certain bound
+///
+/// # Arguments
+///
+/// * `option_name` - name of the config option (config property or environmental variable)
+/// * `value` - value to be validated
+/// * `bound` - upper/lower bound
+/// * `check_out_of_bound` - the method to check against the bound
+///
 fn check_bound<T>(
     option_name: &OptionName,
     value: T,
@@ -471,6 +514,12 @@ where
 }
 
 /// Parse a value to a certain datatype and throw error if parsing not possible
+///
+/// # Arguments
+///
+/// * `option_name` - name of the config option (config property or environmental variable)
+/// * `to_parse` - value to be parsed into a certain T
+///
 fn parse<T: FromStr>(option_name: &OptionName, to_parse: &str) -> Result<T, Error> {
     match to_parse.parse::<T>() {
         Ok(to_parse) => Ok(to_parse),

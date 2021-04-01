@@ -199,7 +199,7 @@ mod tests {
             &OptionKind::Env,
             //"env.sh",
             "env.sh",
-            Some("role_2"),
+            Some("role_1"),
             &test_data,
         );
 

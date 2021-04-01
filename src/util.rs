@@ -3,11 +3,20 @@ use crate::types::{ConfigOption, OptionName, OptionValue};
 use semver::Version;
 use std::collections::HashMap;
 
+/// Check if the final used value corresponds to e.g. recommended or default values.
+///
+/// # Arguments
+///
+/// * `config_options` - map with (defined) config option names and the respective config_option
+/// * `config_file` - the file name to which the config options belongs to
+/// * `config_role` - the role required / used for the config options
+/// * `product_version` - the provided product version
+///
 pub fn filter_config_options(
     config_options: &HashMap<OptionName, ConfigOption>,
     config_file: &str,
     config_role: Option<&str>,
-    version: &str,
+    product_version: &str,
 ) -> Result<HashMap<String, Option<String>>, Error> {
     let mut config_file_options = HashMap::new();
 
@@ -27,10 +36,12 @@ pub fn filter_config_options(
 
         // TODO: What if no recommended or default value provided?
         if let Some(recommended) = &config_option.recommended_values {
-            let option_value = filter_option_value_for_version(recommended, option_name, version)?;
+            let option_value =
+                filter_option_value_for_version(option_name, recommended, product_version)?;
             config_file_options.insert(option_name.name.clone(), Some(option_value.value));
         } else if let Some(default) = &config_option.default_values {
-            let option_value = filter_option_value_for_version(default, option_name, version)?;
+            let option_value =
+                filter_option_value_for_version(option_name, default, product_version)?;
             config_file_options.insert(option_name.name.clone(), Some(option_value.value));
         }
     }
@@ -38,6 +49,13 @@ pub fn filter_config_options(
     Ok(config_file_options)
 }
 
+/// Check if the provided config role matches the "required" config option role
+///
+/// # Arguments
+///
+/// * `config_options` - map with (defined) config option names and the respective config_option
+/// * `config_role` - the role required / used for the config options
+///
 pub fn option_role_matches(config_option: &ConfigOption, config_role: &str) -> bool {
     let mut role_match = false;
     if let Some(roles) = &config_option.roles {
@@ -51,9 +69,17 @@ pub fn option_role_matches(config_option: &ConfigOption, config_role: &str) -> b
     role_match
 }
 
+/// Get the correct value from recommended / default values depending on the version
+///
+/// # Arguments
+///
+/// * `option_name` - name of the config option (config property or environmental variable)
+/// * `option_values` - list of option values and their respective versions
+/// * `version` - product / controller version
+///
 pub fn filter_option_value_for_version(
-    option_values: &[OptionValue],
     option_name: &OptionName,
+    option_values: &[OptionValue],
     version: &str,
 ) -> Result<OptionValue, Error> {
     let product_version = Version::parse(version)?;
