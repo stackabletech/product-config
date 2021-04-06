@@ -76,18 +76,22 @@
       "option_names": [
         {
           "name": "ENV_VAR_INTEGER_PORT_MIN_MAX",
-          "kind": "env",
-          "config_file": "env.sh"
+          "kind": {
+            "type": "env",
+            "file": "env.sh"
+          }
         },
         {
           "name": "conf.var.integer.port.min.max",
-          "kind": "conf",
-          "config_file": "my.config"
+          "kind": {
+            "type": "conf",
+            "file": "my.config"
+          }
         }
       ],
       "datatype": {
         "type": "integer",
-        "min": "0",
+        "min": "1",
         "max": "65535",
         "unit": "port"
       },
@@ -123,13 +127,17 @@
       "option_names": [
         {
           "name": "ENV_PROPERTY_STRING_MEMORY",
-          "kind": "env",
-          "config_file": "env.sh"
+          "kind": {
+            "type": "env",
+            "file": "env.sh"
+          }
         },
         {
           "name": "conf.property.string.memory",
-          "kind": "conf",
-          "config_file": "my.config"
+          "kind": {
+            "type": "conf",
+            "file": "my.config"
+          }
         }
       ],
       "datatype": {
@@ -174,13 +182,17 @@
       "option_names": [
         {
           "name": "ENV_PROPERTY_STRING_DEPRECATED",
-          "kind": "env",
-          "config_file": "env.sh"
+          "kind": {
+            "type": "env",
+            "file": "env.sh"
+          }
         },
         {
           "name": "conf.property.string.deprecated",
-          "kind": "conf",
-          "config_file": "my.config"
+          "kind": {
+            "type": "conf",
+            "file": "my.config"
+          }
         }
       ],
       "datatype": {
@@ -195,13 +207,17 @@
       "option_names": [
         {
           "name": "ENV_VAR_ALLOWED_VALUES",
-          "kind": "env",
-          "config_file": "env.sh"
+          "kind": {
+            "type": "env",
+            "file": "env.sh"
+          }
         },
         {
           "name": "conf.var.allowed.values",
-          "kind": "conf",
-          "config_file": "my.config"
+          "kind": {
+            "type": "conf",
+            "file": "my.config"
+          }
         }
       ],
       "default_values": [
@@ -236,13 +252,17 @@
       "option_names": [
         {
           "name": "ENV_VAR_SECURITY",
-          "kind": "env",
-          "config_file": "env.sh"
+          "kind": {
+            "type": "env",
+            "file": "env.sh"
+          }
         },
         {
           "name": "conf.var.security",
-          "kind": "conf",
-          "config_file": "my.config"
+          "kind": {
+            "type": "conf",
+            "file": "my.config"
+          }
         }
       ],
       "datatype": {
@@ -271,13 +291,17 @@
       "option_names": [
         {
           "name": "ENV_VAR_SECURITY_PASSWORD",
-          "kind": "env",
-          "config_file": "env.sh"
+          "kind": {
+            "type": "env",
+            "file": "env.sh"
+          }
         },
         {
           "name": "conf.var.security.password",
-          "kind": "conf",
-          "config_file": "my.config"
+          "kind": {
+            "type": "conf",
+            "file": "my.config"
+          }
         }
       ],
       "datatype": {
@@ -290,13 +314,17 @@
           "option_names": [
             {
               "name": "ENV_VAR_SECURITY",
-              "kind": "env",
-              "config_file": "env.sh"
+              "kind": {
+                "type": "env",
+                "file": "env.sh"
+              }
             },
             {
               "name": "conf.var.security",
-              "kind": "conf",
-              "config_file": "my.config"
+              "kind": {
+                "type": "conf",
+                "file": "my.config"
+              }
             }
           ],
           "value": "true"
@@ -308,13 +336,17 @@
       "option_names": [
         {
           "name": "ENV_SSL_ENABLED",
-          "kind": "env",
-          "config_file": "env.sh"
+          "kind": {
+            "type": "env",
+            "file": "env.sh"
+          }
         },
         {
           "name": "conf.ssl.enabled",
-          "kind": "conf",
-          "config_file": "my.config"
+          "kind": {
+            "type": "conf",
+            "file": "my.config"
+          }
         }
       ],
       "datatype": {
@@ -342,13 +374,17 @@
       "option_names": [
         {
           "name": "ENV_SSL_CERTIFICATE_PATH",
-          "kind": "env",
-          "config_file": "env.sh"
+          "kind": {
+            "type": "env",
+            "file": "env.sh"
+          }
         },
         {
           "name": "conf.ssl.certificate.path",
-          "kind": "conf",
-          "config_file": "my.config"
+          "kind": {
+            "type": "conf",
+            "file": "my.config"
+          }
         }
       ],
       "roles": [
@@ -371,13 +407,17 @@
           "option_names": [
             {
               "name": "ENV_SSL_ENABLED",
-              "kind": "env",
-              "config_file": "env.sh"
+              "kind": {
+                "type": "env",
+                "file": "env.sh"
+              }
             },
             {
               "name": "conf.ssl.enabled",
-              "kind": "conf",
-              "config_file": "my.config"
+              "kind": {
+                "type": "conf",
+                "file": "my.config"
+              }
             }
           ],
           "value": "true"

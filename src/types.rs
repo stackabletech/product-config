@@ -39,7 +39,6 @@ pub struct ConfigOption {
 pub struct OptionName {
     pub name: String,
     pub kind: OptionKind,
-    pub config_file: String,
 }
 
 impl fmt::Display for OptionName {
@@ -50,11 +49,21 @@ impl fmt::Display for OptionName {
 
 /// represents different config identifier types like config property, environment variable, command line parameter etc.
 #[derive(Deserialize, Clone, Debug, Hash, Eq, PartialOrd, PartialEq)]
-#[serde(rename_all = "lowercase")]
+#[serde(tag = "type", content = "file", rename_all = "lowercase")]
 pub enum OptionKind {
-    Conf,
-    Env,
+    Conf(String),
+    Env(String),
     Cli,
+}
+
+impl OptionKind {
+    pub fn get_file_name(&self) -> String {
+        match self {
+            OptionKind::Conf(conf) => conf.clone(),
+            OptionKind::Env(env) => env.clone(),
+            OptionKind::Cli => "".to_string(),
+        }
+    }
 }
 
 /// represents the config unit (name corresponds to the unit type like password and a given regex)

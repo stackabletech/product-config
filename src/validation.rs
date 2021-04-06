@@ -550,8 +550,7 @@ mod tests {
     fn get_option_name() -> OptionName {
         OptionName {
             name: NAME.to_string(),
-            kind: OptionKind::Conf,
-            config_file: CONFIG_VALUE.to_string(),
+            kind: OptionKind::Conf(CONFIG_VALUE.to_string()),
         }
     }
 

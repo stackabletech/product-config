@@ -1,5 +1,5 @@
 use crate::error::Error;
-use crate::types::{ConfigOption, OptionName, OptionValue};
+use crate::types::{ConfigOption, OptionKind, OptionName, OptionValue};
 use semver::Version;
 use std::collections::HashMap;
 
@@ -8,27 +8,27 @@ use std::collections::HashMap;
 /// # Arguments
 ///
 /// * `config_options` - map with (defined) config option names and the respective config_option
-/// * `config_file` - the file name to which the config options belongs to
-/// * `config_role` - the role required / used for the config options
-/// * `product_version` - the provided product version
+/// * `kind` - config kind provided by the user -> relate to config_option.option_name.kind
+/// * `role` - the role required / used for the config options
+/// * `version` - the provided product version
 ///
 pub fn filter_config_options(
     config_options: &HashMap<OptionName, ConfigOption>,
-    config_file: &str,
-    config_role: Option<&str>,
-    product_version: &str,
+    kind: &OptionKind,
+    role: Option<&str>,
+    version: &str,
 ) -> Result<HashMap<String, Option<String>>, Error> {
     let mut config_file_options = HashMap::new();
 
     for (option_name, config_option) in config_options {
         // config file matches?
-        if option_name.config_file != config_file {
+        if option_name.kind.get_file_name() != kind.get_file_name() {
             continue;
         }
 
         // role exists and matches?
-        // TODO: Right now not providing a role is ignored. Throw error?
-        if let Some(role) = config_role {
+        // TODO: Right now, not providing a role is ignored. Throw error?
+        if let Some(role) = role {
             if !option_role_matches(&config_option, role) {
                 continue;
             }
@@ -36,12 +36,10 @@ pub fn filter_config_options(
 
         // TODO: What if no recommended or default value provided?
         if let Some(recommended) = &config_option.recommended_values {
-            let option_value =
-                filter_option_value_for_version(option_name, recommended, product_version)?;
+            let option_value = filter_option_value_for_version(option_name, recommended, version)?;
             config_file_options.insert(option_name.name.clone(), Some(option_value.value));
         } else if let Some(default) = &config_option.default_values {
-            let option_value =
-                filter_option_value_for_version(option_name, default, product_version)?;
+            let option_value = filter_option_value_for_version(option_name, default, version)?;
             config_file_options.insert(option_name.name.clone(), Some(option_value.value));
         }
     }
