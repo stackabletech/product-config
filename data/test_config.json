@@ -104,6 +104,7 @@
       "recommended_values": [
         {
           "from_version": "0.5.0",
+          "to_version": "0.9.11",
           "value": "20000"
         },
         {
@@ -158,7 +159,7 @@
       "recommended_values": [
         {
           "from_version": "0.5.0",
-          "to_version": "1.0.0",
+          "to_version": "0.7.22",
           "value": "1g"
         },
         {

@@ -36,7 +36,7 @@ pub enum ProductConfigResult {
     /// left out from the user config in the future.
     Default(String),
     /// On Recommended, the value from the recommended section depending
-    /// on the product version was used. Can be because of automatic enhancement,
+    /// on the product version was used. May be because of automatic enhancement,
     /// matching config file and role etc.
     Recommended(String),
     /// On Valid, the value passed all checks and can be used.
@@ -91,8 +91,8 @@ impl ProductConfig {
     /// let config = ProductConfig::new(ConfigJsonReader::new("data/test_config.json")).unwrap();
     ///
     /// let mut user_data = HashMap::new();
-    /// user_data.insert("ENV_VAR_INTEGER_PORT_MIN_MAX".to_string(), Some("12345".to_string()));
-    /// user_data.insert("ENV_PROPERTY_STRING_MEMORY".to_string(), Some("1g".to_string()));
+    /// user_data.insert("ENV_VAR_INTEGER_PORT_MIN_MAX".to_string(), "12345".to_string());
+    /// user_data.insert("ENV_PROPERTY_STRING_MEMORY".to_string(), "1g".to_string());
     ///
     /// let env_sh = config.get(
     ///     "0.5.0",
@@ -107,14 +107,14 @@ impl ProductConfig {
         version: &str,
         kind: &OptionKind,
         role: Option<&str>,
-        user_config: &HashMap<String, Option<String>>,
+        user_config: &HashMap<String, String>,
     ) -> HashMap<String, ProductConfigResult> {
         let mut result_config = HashMap::new();
 
         // collect all available options (user and config)
         let merged_config_options = self.merge_config_options(user_config, version, kind, role);
 
-        for (name, value) in &merged_config_options {
+        for (name, option_value) in &merged_config_options {
             let option_name = &OptionName {
                 name: name.clone(),
                 kind: kind.clone(),
@@ -129,7 +129,7 @@ impl ProductConfig {
                     version,
                     role,
                     option_name,
-                    value.clone(),
+                    option_value,
                 ),
             );
         }
@@ -148,11 +148,11 @@ impl ProductConfig {
     ///
     fn merge_config_options(
         &self,
-        user_config: &HashMap<String, Option<String>>,
+        user_config: &HashMap<String, String>,
         version: &str,
         kind: &OptionKind,
         role: Option<&str>,
-    ) -> HashMap<String, Option<String>> {
+    ) -> HashMap<String, String> {
         let mut merged_config_options = HashMap::new();
 
         if let Ok(options) = util::filter_config_options(&self.config_options, kind, role, version)
@@ -237,16 +237,13 @@ mod tests {
         let mut test_data = HashMap::new();
         test_data.insert(
             "ENV_VAR_INTEGER_PORT_MIN_MAX".to_string(),
-            Some("123456".to_string()),
+            "123456".to_string(),
         );
-        test_data.insert(
-            "ENV_PROPERTY_STRING_MEMORY".to_string(),
-            Some("1g".to_string()),
-        );
+        test_data.insert("ENV_PROPERTY_STRING_MEMORY".to_string(), "1g".to_string());
 
         test_data.insert(
             "ENV_SSL_CERTIFICATE_PATH".to_string(),
-            Some("/tmp/ssl_key.xyz".to_string()),
+            "/tmp/ssl_key.xyz".to_string(),
         );
 
         let temp = config.get(

@@ -110,15 +110,6 @@ pub enum Error {
     },
 
     #[error(
-    "[{option_name}]: dependency '{dependency}' requires value missing value '{required_value}' to be set"
-    )]
-    ConfigDependencyUserValueMissing {
-        option_name: OptionName,
-        dependency: String,
-        required_value: String,
-    },
-
-    #[error(
         "[{option_name}]: provided value '{user_value} does not match required value '{required_value}' for dependency '{dependency}'"
     )]
     ConfigDependencyValueInvalid {

@@ -17,7 +17,7 @@ pub fn filter_config_options(
     kind: &OptionKind,
     role: Option<&str>,
     version: &str,
-) -> Result<HashMap<String, Option<String>>, Error> {
+) -> Result<HashMap<String, String>, Error> {
     let mut config_file_options = HashMap::new();
 
     for (option_name, config_option) in config_options {
@@ -37,10 +37,10 @@ pub fn filter_config_options(
         // TODO: What if no recommended or default value provided?
         if let Some(recommended) = &config_option.recommended_values {
             let option_value = filter_option_value_for_version(option_name, recommended, version)?;
-            config_file_options.insert(option_name.name.clone(), Some(option_value.value));
+            config_file_options.insert(option_name.name.clone(), option_value.value);
         } else if let Some(default) = &config_option.default_values {
             let option_value = filter_option_value_for_version(option_name, default, version)?;
-            config_file_options.insert(option_name.name.clone(), Some(option_value.value));
+            config_file_options.insert(option_name.name.clone(), option_value.value);
         }
     }
 
