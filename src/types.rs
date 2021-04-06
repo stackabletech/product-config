@@ -1,20 +1,20 @@
 use serde::Deserialize;
 use std::fmt;
 
-/// represents the root element structure of JSON/YAML documents
+/// Represents the root element structure of JSON/YAML documents
 #[derive(Deserialize, Debug)]
 pub struct ConfigItem {
     pub config_settings: ConfigSetting,
     pub config_options: Vec<ConfigOption>,
 }
 
-/// represents config settings like unit and regex specification
+/// Represents config settings like unit and regex specification
 #[derive(Deserialize, Debug)]
 pub struct ConfigSetting {
     pub unit: Vec<Unit>,
 }
 
-/// represents one config entry for a given config property or environmental variable
+/// Represents one config option entry for a given config property or environmental variable
 #[derive(Deserialize, Clone, Debug)]
 pub struct ConfigOption {
     pub option_names: Vec<OptionName>,
@@ -34,7 +34,7 @@ pub struct ConfigOption {
     pub description: Option<String>,
 }
 
-/// represents (one of multiple) unique identifier for a config option depending on the type
+/// Represents (one of multiple) unique identifier for a config option depending on the type
 #[derive(Deserialize, Clone, Debug, Hash, Eq, PartialOrd, PartialEq)]
 pub struct OptionName {
     pub name: String,
@@ -47,7 +47,7 @@ impl fmt::Display for OptionName {
     }
 }
 
-/// represents different config identifier types like config property, environment variable, command line parameter etc.
+/// Represents different config identifier types like config property, environment variable, command line parameter etc.
 #[derive(Deserialize, Clone, Debug, Hash, Eq, PartialOrd, PartialEq)]
 #[serde(tag = "type", content = "file", rename_all = "lowercase")]
 pub enum OptionKind {
@@ -66,7 +66,7 @@ impl OptionKind {
     }
 }
 
-/// represents the config unit (name corresponds to the unit type like password and a given regex)
+/// Represents the config unit (name corresponds to the unit type like password and a given regex)
 #[derive(Deserialize, Debug)]
 pub struct Unit {
     pub name: String,
@@ -75,7 +75,7 @@ pub struct Unit {
     pub comment: Option<String>,
 }
 
-/// represents the default value a config option may have: since default values may change with different releases, optional from and to version parameters can be provided
+/// Represents the default value a config option may have: since default values may change with different releases, optional from and to version parameters can be provided
 #[derive(Deserialize, Clone, Debug)]
 pub struct OptionValue {
     pub from_version: Option<String>,
@@ -83,7 +83,7 @@ pub struct OptionValue {
     pub value: String,
 }
 
-/// represents all supported data types
+/// Represents all supported data types
 #[derive(Deserialize, Clone, Debug)]
 #[serde(rename_all = "lowercase", tag = "type")]
 pub enum Datatype {
@@ -116,7 +116,7 @@ pub enum Datatype {
     },
 }
 
-/// represents a dependency on another config option and (if available) a required value
+/// Represents a dependency on another config option and (if available) a required value
 /// e.g. to set ssl certificates one has to set some property use_ssl to true
 #[derive(Deserialize, Clone, Debug)]
 pub struct Dependency {
@@ -124,6 +124,8 @@ pub struct Dependency {
     pub value: Option<String>,
 }
 
+/// Represents a role in the cluster, e.g. Server / Client and if the
+/// config option is required
 #[derive(Deserialize, Clone, Debug)]
 pub struct Role {
     pub name: String,

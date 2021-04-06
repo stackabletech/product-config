@@ -15,15 +15,14 @@ type ConfigValidationResult<T> = Result<T, Error>;
 /// Returns the provided option_value if no validation errors appear
 ///
 /// # Arguments
-///
+/// * `config_options` - map with OptionName as key and the corresponding ConfigOption as value
+/// * `config_setting_units` - map with unit name and respective regular expression to evaluate the datatype
+/// * `merged_config_options` - merged user and config options (matching role, kind etc.)
 /// * `product_version` - version of the currently active product version
+/// * `role` - the user role to validate against
 /// * `option_name` - name of the config option (config property or environmental variable)
 /// * `option_value` - config option value to be validated; Option.None means missing, Option<""> will avoid some checks and set option to empty
 ///
-/// # Examples
-///
-/// ```
-/// ```
 pub fn validate(
     config_options: &HashMap<OptionName, ConfigOption>,
     config_setting_units: &HashMap<String, Regex>,
@@ -151,12 +150,12 @@ fn check_option_value_used(
 /// # Arguments
 ///
 /// * `option_name` - name of the config option (config property or environmental variable)
-/// * `config_roles` - config roles provided in the option definition
+/// * `option_config_roles` - config roles provided in the option definition
 /// * `config_role` - config role provided by the user
 ///
 fn check_role(
     option_name: &OptionName,
-    config_roles: &Option<Vec<Role>>,
+    option_config_roles: &Option<Vec<Role>>,
     config_role: Option<&str>,
 ) -> ConfigValidationResult<()> {
     if config_roles.is_none() {
@@ -171,7 +170,7 @@ fn check_role(
         });
     }
 
-    if let (Some(roles), Some(user_role)) = (config_roles, config_role) {
+    if let (Some(roles), Some(user_role)) = (option_config_roles, config_role) {
         for role in roles {
             if role.name == user_role && role.required {
                 return Ok(());
