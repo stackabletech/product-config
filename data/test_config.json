@@ -77,7 +77,7 @@
         {
           "name": "ENV_VAR_INTEGER_PORT_MIN_MAX",
           "kind": {
-            "type": "env",
+            "type": "conf",
             "file": "env.sh"
           }
         },
@@ -127,9 +127,60 @@
     {
       "option_names": [
         {
+          "name": "ENV_VAR_FLOAT",
+          "kind": {
+            "type": "conf",
+            "file": "env.sh"
+          }
+        },
+        {
+          "name": "conf.var.float",
+          "kind": {
+            "type": "conf",
+            "file": "my.config"
+          }
+        }
+      ],
+      "datatype": {
+        "type": "float",
+        "min": "0.0",
+        "max": "100.0"
+      },
+      "default_values": [
+        {
+          "from_version": "0.5.0",
+          "value": "40.123"
+        }
+      ],
+      "recommended_values": [
+        {
+          "from_version": "0.5.0",
+          "to_version": "0.9.11",
+          "value": "50.0"
+        },
+        {
+          "from_version": "1.0.0",
+          "value": "55.0"
+        }
+      ],
+      "roles": [
+        {
+          "name": "role_1",
+          "required": true
+        },
+        {
+          "name": "role_2",
+          "required": false
+        }
+      ],
+      "as_of_version": "0.5.0"
+    },
+    {
+      "option_names": [
+        {
           "name": "ENV_PROPERTY_STRING_MEMORY",
           "kind": {
-            "type": "env",
+            "type": "conf",
             "file": "env.sh"
           }
         },
@@ -184,7 +235,7 @@
         {
           "name": "ENV_PROPERTY_STRING_DEPRECATED",
           "kind": {
-            "type": "env",
+            "type": "conf",
             "file": "env.sh"
           }
         },
@@ -209,7 +260,7 @@
         {
           "name": "ENV_VAR_ALLOWED_VALUES",
           "kind": {
-            "type": "env",
+            "type": "conf",
             "file": "env.sh"
           }
         },
@@ -254,7 +305,7 @@
         {
           "name": "ENV_VAR_SECURITY",
           "kind": {
-            "type": "env",
+            "type": "conf",
             "file": "env.sh"
           }
         },
@@ -293,7 +344,7 @@
         {
           "name": "ENV_VAR_SECURITY_PASSWORD",
           "kind": {
-            "type": "env",
+            "type": "conf",
             "file": "env.sh"
           }
         },
@@ -316,7 +367,7 @@
             {
               "name": "ENV_VAR_SECURITY",
               "kind": {
-                "type": "env",
+                "type": "conf",
                 "file": "env.sh"
               }
             },
@@ -338,7 +389,7 @@
         {
           "name": "ENV_SSL_ENABLED",
           "kind": {
-            "type": "env",
+            "type": "conf",
             "file": "env.sh"
           }
         },
@@ -376,7 +427,7 @@
         {
           "name": "ENV_SSL_CERTIFICATE_PATH",
           "kind": {
-            "type": "env",
+            "type": "conf",
             "file": "env.sh"
           }
         },
@@ -409,7 +460,7 @@
             {
               "name": "ENV_SSL_ENABLED",
               "kind": {
-                "type": "env",
+                "type": "conf",
                 "file": "env.sh"
               }
             },

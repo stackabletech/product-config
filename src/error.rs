@@ -94,19 +94,28 @@ pub enum Error {
     },
 
     // dependency
-    #[error("[{option_name}]: required dependency not provided: '{dependency}'")]
+    #[error("[{option_name}]: required dependency not provided: '{dependency:?}'")]
     ConfigDependencyMissing {
         option_name: OptionName,
-        dependency: String,
+        dependency: Vec<OptionName>,
     },
 
     #[error(
         "[{option_name}]: dependency '{dependency}' requires no values, but was set to '{user_value}'"
     )]
-    ConfigDependencyValueMissing {
+    ConfigDependencyUserValueNotRequired {
         option_name: OptionName,
         dependency: String,
         user_value: String,
+    },
+
+    #[error(
+        "[{option_name}]: dependency '{dependency}' requires value '{required_value}' to be set"
+    )]
+    ConfigDependencyUserValueMissing {
+        option_name: OptionName,
+        dependency: String,
+        required_value: String,
     },
 
     #[error(

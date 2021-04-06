@@ -79,7 +79,7 @@ pub fn validate(
             None => {}
             Some(err) => {
                 return match err {
-                    Error::ConfigDependencyValueMissing { .. } => {
+                    Error::ConfigDependencyUserValueNotRequired { .. } => {
                         ProductConfigResult::Warn(option_value.to_string(), err)
                     }
                     _ => ProductConfigResult::Error(err),
@@ -158,7 +158,7 @@ fn check_role(
     option_config_roles: &Option<Vec<Role>>,
     config_role: Option<&str>,
 ) -> ConfigValidationResult<()> {
-    if config_roles.is_none() {
+    if option_config_roles.is_none() {
         return Err(Error::ConfigOptionRoleNotProvided {
             name: option_name.clone(),
         });
@@ -247,44 +247,59 @@ fn check_dependencies(
     };
 
     // for each dependency, check if user_options contains the config option and the correct value
-    for dependency in config_option_dependencies {
+    for config_option_dependency in config_option_dependencies {
+        // check if we find any matches, otherwise return error after the loop
+        let mut found_match = false;
         // for each option name provided within the dependency
-        for dependency_option in &dependency.option_names {
-            if !user_options.contains_key(&dependency_option.name) {
+        for dependency_option_name in &config_option_dependency.option_names {
+            if !user_options.contains_key(&dependency_option_name.name) {
                 continue;
             }
 
-            match user_options.get(&dependency_option.name) {
-                None => {
-                    // TODO: Error or just add the correct dependency?
-                    return Err(Error::ConfigDependencyMissing {
+            found_match = true;
+
+            match (
+                user_options.get(&dependency_option_name.name),
+                &config_option_dependency.value,
+            ) {
+                // no user value, no config value -> ok
+                (None, None) => continue,
+                // no user value but config value required -> error
+                (None, Some(config_value)) => {
+                    return Err(Error::ConfigDependencyUserValueMissing {
                         option_name: option_name.clone(),
-                        dependency: dependency_option.name.clone(),
-                    });
+                        dependency: dependency_option_name.name.clone(),
+                        required_value: config_value.clone(),
+                    })
                 }
-                Some(user_value) => {
-                    // a value is set for the dependency
-                    match &dependency.value {
-                        None => {
-                            return Err(Error::ConfigDependencyValueMissing {
-                                option_name: option_name.clone(),
-                                dependency: dependency_option.name.clone(),
-                                user_value: user_value.clone(),
-                            });
-                        }
-                        Some(required_val) => {
-                            if user_value != required_val {
-                                return Err(Error::ConfigDependencyValueInvalid {
-                                    option_name: option_name.clone(),
-                                    dependency: dependency_option.name.clone(),
-                                    user_value: user_value.clone(),
-                                    required_value: required_val.clone(),
-                                });
-                            }
-                        }
+                // user value but no config value required -> error
+                (Some(user_value), None) => {
+                    return Err(Error::ConfigDependencyUserValueNotRequired {
+                        option_name: option_name.clone(),
+                        dependency: dependency_option_name.name.clone(),
+                        user_value: user_value.clone(),
+                    })
+                }
+                // both values available -> check if match
+                (Some(user_value), Some(config_value)) => {
+                    if user_value != config_value {
+                        return Err(Error::ConfigDependencyValueInvalid {
+                            option_name: option_name.clone(),
+                            dependency: dependency_option_name.name.clone(),
+                            user_value: user_value.clone(),
+                            required_value: config_value.clone(),
+                        });
                     }
                 }
             }
+        }
+
+        if !found_match {
+            // TODO: Error or just add the correct dependency?
+            return Err(Error::ConfigDependencyMissing {
+                option_name: option_name.clone(),
+                dependency: config_option_dependency.option_names.clone(),
+            });
         }
     }
 
@@ -516,23 +531,50 @@ fn parse<T: FromStr>(option_name: &OptionName, to_parse: &str) -> Result<T, Erro
 
 #[cfg(test)]
 mod tests {
-    use crate::error::Error;
-    use crate::types::{OptionKind, OptionName};
-    use crate::validation::check_version_supported_or_deprecated;
-    use rstest::*;
+    macro_rules! hashmap {
+        ($( $key: expr => $val: expr ),*) => {{
+             let mut map = ::std::collections::HashMap::new();
+             $( map.insert($key, $val); )*
+             map
+        }}
+    }
 
-    const NAME: &str = "test_name";
-    const CONFIG_VALUE: &str = "test.config";
+    use crate::error::Error;
+    use crate::reader::ConfigJsonReader;
+    use crate::types::{Datatype, OptionKind, OptionName, Role};
+    use crate::validation::{
+        check_allowed_values, check_datatype, check_dependencies, check_role,
+        check_version_supported_or_deprecated,
+    };
+    use crate::ProductConfig;
+    use rstest::*;
+    use std::collections::HashMap;
+
+    const ENV_VAR_INTEGER_PORT_MIN_MAX: &str = "ENV_VAR_INTEGER_PORT_MIN_MAX";
+    const ENV_PROPERTY_STRING_MEMORY: &str = "ENV_PROPERTY_STRING_MEMORY";
+    const ENV_SSL_CERTIFICATE_PATH: &str = "ENV_SSL_CERTIFICATE_PATH";
+    const ENV_SSL_ENABLED: &str = "ENV_SSL_ENABLED";
+    const CONF_SSL_ENABLED: &str = "conf.ssl.enabled";
+    const ENV_VAR_ALLOWED_VALUES: &str = "ENV_VAR_ALLOWED_VALUES";
+    const ENV_VAR_FLOAT: &str = "ENV_VAR_FLOAT";
+
+    const CONFIG_FILE: &str = "env.sh";
+    const CONFIG_FILE_2: &str = "my.config";
+
     const V_1_5_0: &str = "1.5.0";
     const V_1_0_0: &str = "1.0.0";
     const V_0_5_0: &str = "0.5.0";
     const V_0_1_0: &str = "0.1.0";
 
-    fn get_option_name() -> OptionName {
+    fn get_conf_option_name(name: &str, file: &str) -> OptionName {
         OptionName {
-            name: NAME.to_string(),
-            kind: OptionKind::Conf(CONFIG_VALUE.to_string()),
+            name: name.to_string(),
+            kind: OptionKind::Conf(file.to_string()),
         }
+    }
+
+    fn get_product_config() -> ProductConfig {
+        ProductConfig::new(ConfigJsonReader::new("data/test_config.json")).unwrap()
     }
 
     #[rstest(
@@ -541,10 +583,10 @@ mod tests {
         option_version,
         deprecated_since,
         expected,
-        case(get_option_name(), V_1_0_0, V_0_5_0, None, Ok(())),
-        case(get_option_name(), V_0_1_0, V_1_0_0, Some(V_0_5_0.to_string()),
+        case(get_conf_option_name(ENV_VAR_INTEGER_PORT_MIN_MAX, CONFIG_FILE), V_1_0_0, V_0_5_0, None, Ok(())),
+        case(get_conf_option_name(ENV_VAR_INTEGER_PORT_MIN_MAX, CONFIG_FILE), V_0_1_0, V_1_0_0, Some(V_0_5_0.to_string()),
             Err(Error::VersionNotSupported { option_name: option_name.clone(), product_version: V_0_1_0.to_string(), required_version: V_1_0_0.to_string() })),
-        case(get_option_name(), V_1_5_0, V_0_5_0, Some(V_1_0_0.to_string()),
+        case(get_conf_option_name(ENV_VAR_INTEGER_PORT_MIN_MAX, CONFIG_FILE), V_1_5_0, V_0_5_0, Some(V_1_0_0.to_string()),
             Err(Error::VersionDeprecated { option_name: option_name.clone(), product_version: V_1_5_0.to_string(), deprecated_version: V_1_0_0.to_string() })),
         ::trace
     )]
@@ -565,29 +607,217 @@ mod tests {
         assert_eq!(result, expected)
     }
 
-    // #[rstest(
-    //     config_setting_units,
-    //     option_name,
-    //     option_value,
-    //     datatype,
-    //     expected,
-    //     case(get_option_name(), V_1_0_0, V_0_5_0, None, Ok(())),
-    //     ::trace
-    // )]
-    // fn test_check_datatype(
-    //     config_setting_units: &HashMap<String, Regex>,
-    //     option_name: &OptionName,
-    //     option_value: &str,
-    //     datatype: &Datatype,
-    //     expected: Result<(), Error>,
-    // ) {
-    //     let result = check_datatype(
-    //         &option_name,
-    //         product_version,
-    //         option_version,
-    //         &deprecated_since,
-    //     );
-    //
-    //     assert_eq!(result, expected)
-    // }
+    const ROLE_1: &str = "role_1";
+    const ROLE_2: &str = "role_2";
+
+    #[rstest(
+        option_name,
+        role,
+        expected,
+        case(
+            &get_conf_option_name(ENV_VAR_INTEGER_PORT_MIN_MAX, CONFIG_FILE),
+            Some(ROLE_1),
+            Ok(())
+        ),
+        case(
+            &get_conf_option_name(ENV_VAR_INTEGER_PORT_MIN_MAX, CONFIG_FILE),
+            Some(ROLE_2),
+            Err(Error::ConfigOptionRoleNotFound { name: get_conf_option_name(ENV_VAR_INTEGER_PORT_MIN_MAX, CONFIG_FILE), role: ROLE_2.to_string() })
+        ),
+        case(
+            &get_conf_option_name(ENV_VAR_INTEGER_PORT_MIN_MAX, CONFIG_FILE),
+            None,
+            Err(Error::ConfigOptionRoleNotProvidedByUser { name: get_conf_option_name(ENV_VAR_INTEGER_PORT_MIN_MAX, CONFIG_FILE) })
+        ),
+        ::trace
+    )]
+    fn test_check_role(option_name: &OptionName, role: Option<&str>, expected: Result<(), Error>) {
+        let option_config_roles = Some(vec![
+            Role {
+                name: ROLE_1.to_string(),
+                required: true,
+            },
+            Role {
+                name: ROLE_2.to_string(),
+                required: false,
+            },
+        ]);
+
+        let result = check_role(option_name, &option_config_roles, role);
+
+        assert_eq!(result, expected)
+    }
+
+    #[rstest(
+    option_name,
+    user_options,
+    expected,
+    case(
+        &get_conf_option_name(ENV_SSL_CERTIFICATE_PATH, CONFIG_FILE),
+        hashmap!{
+            ENV_SSL_CERTIFICATE_PATH.to_string() => "some/path/to/certificate".to_string()
+        },
+        Err(Error::ConfigDependencyMissing {
+            option_name: get_conf_option_name(ENV_SSL_CERTIFICATE_PATH, CONFIG_FILE),
+            dependency: vec![
+                OptionName { name: ENV_SSL_ENABLED.to_string(), kind: OptionKind::Conf(CONFIG_FILE.to_string()) },
+                OptionName { name: CONF_SSL_ENABLED.to_string(), kind: OptionKind::Conf(CONFIG_FILE_2.to_string()) }
+            ]
+        })
+    ),
+    case(
+        &get_conf_option_name(ENV_SSL_CERTIFICATE_PATH, CONFIG_FILE),
+        hashmap!{
+            ENV_SSL_CERTIFICATE_PATH.to_string() => "some/path/to/certificate".to_string(),
+            ENV_SSL_ENABLED.to_string() => "false".to_string()
+        },
+        Err(Error::ConfigDependencyValueInvalid {
+            option_name: get_conf_option_name(ENV_SSL_CERTIFICATE_PATH, CONFIG_FILE),
+            dependency: "ENV_SSL_ENABLED".to_string(),
+            user_value: "false".to_string(),
+            required_value: "true".to_string()
+        })
+    ),
+    case(
+        &get_conf_option_name(ENV_SSL_CERTIFICATE_PATH, CONFIG_FILE),
+        hashmap!{
+            ENV_SSL_CERTIFICATE_PATH.to_string() => "some/path/to/certificate".to_string(),
+            ENV_SSL_ENABLED.to_string() => "true".to_string()
+        },
+        Ok(())
+    ),
+    ::trace
+    )]
+    fn test_check_dependencies(
+        option_name: &OptionName,
+        user_options: HashMap<String, String>,
+        expected: Result<(), Error>,
+    ) {
+        let product_config = get_product_config();
+        let config_option = product_config.config_options.get(&option_name).unwrap();
+
+        let result = check_dependencies(&option_name, config_option, &user_options);
+
+        assert_eq!(result, expected)
+    }
+
+    const MIN_PORT: &str = "1";
+    const MAX_PORT: &str = "65535";
+    const PORT_CORRECT: &str = "12345";
+    const PORT_BAD_DATATYPE: &str = "123aaa";
+    const PORT_OUT_OF_BOUNDS: &str = "77777";
+
+    const MEMORY_CORRECT_MB: &str = "512mb";
+    const MEMORY_CORRECT_GB: &str = "2gb";
+    const MEMORY_MISSING_UNIT: &str = "512";
+
+    const FLOAT_CORRECT: &str = "87.2123";
+    const FLOAT_BAD: &str = "100,0";
+
+    #[rstest(
+        option_name,
+        option_value,
+        datatype,
+        expected,
+        case(
+            &get_conf_option_name(ENV_VAR_INTEGER_PORT_MIN_MAX, CONFIG_FILE),
+            PORT_CORRECT,
+            &Datatype::Integer{ min: Some(MIN_PORT.to_string()), max: Some(MAX_PORT.to_string()), unit: Some("port".to_string()), accepted_units: None, default_unit:None },
+            Ok(())
+        ),
+        case(
+            &get_conf_option_name(ENV_VAR_INTEGER_PORT_MIN_MAX, CONFIG_FILE),
+            PORT_BAD_DATATYPE,
+            &Datatype::Integer{ min: Some(MIN_PORT.to_string()), max: Some(MAX_PORT.to_string()), unit: Some("port".to_string()), accepted_units: None, default_unit:None },
+            Err(Error::DatatypeNotMatching { option_name: get_conf_option_name(ENV_VAR_INTEGER_PORT_MIN_MAX, CONFIG_FILE), value: PORT_BAD_DATATYPE.to_string(), datatype: "i64".to_string() })
+        ),
+        case(
+            &get_conf_option_name(ENV_VAR_INTEGER_PORT_MIN_MAX, CONFIG_FILE),
+            PORT_OUT_OF_BOUNDS,
+            &Datatype::Integer{ min: Some(MIN_PORT.to_string()), max: Some(MAX_PORT.to_string()), unit: Some("port".to_string()), accepted_units: None, default_unit:None },
+            Err(Error::ConfigValueOutOfBounds { option_name: get_conf_option_name(ENV_VAR_INTEGER_PORT_MIN_MAX, CONFIG_FILE), received: PORT_OUT_OF_BOUNDS.to_string(), expected: MAX_PORT.to_string() })
+        ),
+        case(
+            &get_conf_option_name(ENV_PROPERTY_STRING_MEMORY, CONFIG_FILE),
+            MEMORY_CORRECT_MB,
+            &Datatype::String{ min: None, max: None, unit: Some("memory".to_string()), accepted_units: None, default_unit:None },
+            Ok(())
+        ),
+        case(
+            &get_conf_option_name(ENV_PROPERTY_STRING_MEMORY, CONFIG_FILE),
+            MEMORY_CORRECT_GB,
+            &Datatype::String{ min: None, max: None, unit: Some("memory".to_string()), accepted_units: None, default_unit:None },
+            Ok(())
+        ),
+        case(
+            &get_conf_option_name(ENV_PROPERTY_STRING_MEMORY, CONFIG_FILE),
+            MEMORY_MISSING_UNIT,
+            &Datatype::String{ min: None, max: None, unit: Some("memory".to_string()), accepted_units: None, default_unit:None },
+            Err(Error::DatatypeRegexNotMatching { option_name: get_conf_option_name(ENV_PROPERTY_STRING_MEMORY, CONFIG_FILE), value: MEMORY_MISSING_UNIT.to_string() })
+        ),
+        case(
+            &get_conf_option_name(ENV_VAR_FLOAT, CONFIG_FILE),
+            FLOAT_CORRECT,
+            &Datatype::Float{ min: Some("0.0".to_string()), max: Some("100.0".to_string()), unit: None, accepted_units: None, default_unit:None },
+            Ok(())
+        ),
+        case(
+            &get_conf_option_name(ENV_VAR_FLOAT, CONFIG_FILE),
+            FLOAT_BAD,
+            &Datatype::Float{ min: Some("0.0".to_string()), max: Some("100.0".to_string()), unit: None, accepted_units: None, default_unit:None },
+            Err(Error::DatatypeNotMatching { option_name: get_conf_option_name(ENV_VAR_FLOAT, CONFIG_FILE), value: FLOAT_BAD.to_string(), datatype: "f64".to_string() })
+        ),
+    ::trace
+    )]
+    fn test_check_datatype(
+        option_name: &OptionName,
+        option_value: &str,
+        datatype: &Datatype,
+        expected: Result<(), Error>,
+    ) {
+        let config_setting_units = get_product_config().config_setting_units;
+
+        let result = check_datatype(&config_setting_units, option_name, option_value, &datatype);
+
+        assert_eq!(result, expected)
+    }
+
+    const ALLOWED_VALUE_1: &str = "allowed_value_1";
+    const ALLOWED_VALUE_2: &str = "allowed_value_2";
+    const ALLOWED_VALUE_3: &str = "allowed_value_3";
+    const NOT_ALLOWED_VALUE: &str = "not_allowed_value";
+
+    #[rstest(
+        option_name,
+        option_value,
+        allowed_values,
+        expected,
+        case(
+            &get_conf_option_name(ENV_VAR_ALLOWED_VALUES, CONFIG_FILE),
+            ALLOWED_VALUE_1,
+            Some(vec![ALLOWED_VALUE_1.to_string(), ALLOWED_VALUE_2.to_string(), ALLOWED_VALUE_3.to_string()]),
+            Ok(())
+        ),
+        case(
+            &get_conf_option_name(ENV_VAR_ALLOWED_VALUES, CONFIG_FILE),
+            NOT_ALLOWED_VALUE,
+            Some(vec![ALLOWED_VALUE_1.to_string(), ALLOWED_VALUE_2.to_string(), ALLOWED_VALUE_3.to_string()]),
+            Err(Error::ConfigValueNotInAllowedValues {
+                option_name: get_conf_option_name(ENV_VAR_ALLOWED_VALUES, CONFIG_FILE),
+                value: NOT_ALLOWED_VALUE.to_string(),
+                allowed_values: vec![ALLOWED_VALUE_1.to_string(), ALLOWED_VALUE_2.to_string(), ALLOWED_VALUE_3.to_string() ]
+            })
+        ),
+    ::trace
+    )]
+    fn test_check_allowed_values(
+        option_name: &OptionName,
+        option_value: &str,
+        allowed_values: Option<Vec<String>>,
+        expected: Result<(), Error>,
+    ) {
+        let result = check_allowed_values(option_name, option_value, &allowed_values);
+
+        assert_eq!(result, expected)
+    }
 }

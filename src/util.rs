@@ -54,11 +54,11 @@ pub fn filter_config_options(
 /// * `config_options` - map with (defined) config option names and the respective config_option
 /// * `role` - the role required / used for the config options
 ///
-pub fn option_role_matches(config_option: &ConfigOption, role: &str) -> bool {
+pub fn option_role_matches(config_option: &ConfigOption, user_role: &str) -> bool {
     let mut role_match = false;
     if let Some(roles) = &config_option.roles {
         for role in roles {
-            if role.required && role.name == role {
+            if role.required && role.name == user_role {
                 role_match = true;
                 break;
             }

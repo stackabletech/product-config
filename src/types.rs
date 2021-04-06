@@ -47,12 +47,12 @@ impl fmt::Display for OptionName {
     }
 }
 
-/// Represents different config identifier types like config property, environment variable, command line parameter etc.
+/// Represents different config identifier types like config file, environment variable, command line parameter etc.
 #[derive(Deserialize, Clone, Debug, Hash, Eq, PartialOrd, PartialEq)]
 #[serde(tag = "type", content = "file", rename_all = "lowercase")]
 pub enum OptionKind {
     Conf(String),
-    Env(String),
+    Env,
     Cli,
 }
 
@@ -60,8 +60,7 @@ impl OptionKind {
     pub fn get_file_name(&self) -> String {
         match self {
             OptionKind::Conf(conf) => conf.clone(),
-            OptionKind::Env(env) => env.clone(),
-            OptionKind::Cli => "".to_string(),
+            _ => "".to_string(),
         }
     }
 }

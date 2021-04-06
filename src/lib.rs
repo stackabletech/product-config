@@ -96,7 +96,7 @@ impl ProductConfig {
     ///
     /// let env_sh = config.get(
     ///     "0.5.0",
-    ///     &OptionKind::Env("env.sh".to_string()),
+    ///     &OptionKind::Conf("env.sh".to_string()),
     ///     Some("role_1"),
     ///     &user_data,
     /// );
@@ -248,7 +248,7 @@ mod tests {
 
         let temp = config.get(
             "0.5.0",
-            &OptionKind::Env("env.sh".to_string()),
+            &OptionKind::Conf("env.sh".to_string()),
             Some("role_1"),
             &test_data,
         );
