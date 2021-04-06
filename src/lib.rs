@@ -91,7 +91,7 @@ impl ProductConfig {
     /// let config = ProductConfig::new(ConfigJsonReader::new("data/test_config.json")).unwrap();
     ///
     /// let mut user_data = HashMap::new();
-    /// user_data.insert("ENV_VAR_INTEGER_PORT_MIN_MAX".to_string(), "12345".to_string());
+    /// user_data.insert("ENV_INTEGER_PORT_MIN_MAX".to_string(), "12345".to_string());
     /// user_data.insert("ENV_PROPERTY_STRING_MEMORY".to_string(), "1g".to_string());
     ///
     /// let env_sh = config.get(
@@ -228,35 +228,129 @@ mod tests {
     use crate::reader::ConfigJsonReader;
     use crate::types::{OptionKind, OptionName};
     use crate::{ProductConfig, ProductConfigResult};
+    use rstest::*;
     use std::collections::HashMap;
 
-    #[test]
-    fn test() {
+    const ENV_INTEGER_PORT_MIN_MAX: &str = "ENV_INTEGER_PORT_MIN_MAX";
+
+    const ENV_FLOAT: &str = "ENV_FLOAT";
+    //const ENV_PROPERTY_STRING_MEMORY: &str = "ENV_PROPERTY_STRING_MEMORY";
+    //const ENV_PROPERTY_STRING_DEPRECATED: &str = "ENV_PROPERTY_STRING_DEPRECATED";
+    //const ENV_ALLOWED_VALUES: &str = "ENV_ALLOWED_VALUES";
+    //const ENV_SECURITY: &str = "ENV_SECURITY";
+    //const ENV_SECURITY_PASSWORD: &str = "ENV_SECURITY_PASSWORD";
+    const ENV_SSL_ENABLED: &str = "ENV_SSL_ENABLED";
+    const ENV_SSL_CERTIFICATE_PATH: &str = "ENV_SSL_CERTIFICATE_PATH";
+
+    const ROLE_1: &str = "role_1";
+    const VERSION_0_5_0: &str = "0.5.0";
+    const CONF_FILE: &str = "env.sh";
+
+    fn create_empty_data_and_expect() -> (
+        HashMap<String, String>,
+        HashMap<String, ProductConfigResult>,
+    ) {
+        let ssl_enabled = "false";
+        let float_recommended = "50.0";
+        let port_recommended = "20000";
+
+        let data = HashMap::new();
+
+        let mut expected = HashMap::new();
+        expected.insert(
+            ENV_INTEGER_PORT_MIN_MAX.to_string(),
+            ProductConfigResult::Recommended(port_recommended.to_string()),
+        );
+        expected.insert(
+            ENV_SSL_ENABLED.to_string(),
+            ProductConfigResult::Default(ssl_enabled.to_string()),
+        );
+        expected.insert(
+            ENV_FLOAT.to_string(),
+            ProductConfigResult::Recommended(float_recommended.to_string()),
+        );
+        (data, expected)
+    }
+
+    fn create_correct_data_and_expect() -> (
+        HashMap<String, String>,
+        HashMap<String, ProductConfigResult>,
+    ) {
+        let port = "12345";
+        let ssl_enabled = "true";
+        let certificate_path = "/tmp/ssl_key.xyz";
+        let float_value = "55.555";
+
+        let mut data = HashMap::new();
+        data.insert(ENV_INTEGER_PORT_MIN_MAX.to_string(), port.to_string());
+        data.insert(
+            ENV_SSL_CERTIFICATE_PATH.to_string(),
+            certificate_path.to_string(),
+        );
+        data.insert(ENV_SSL_ENABLED.to_string(), ssl_enabled.to_string());
+        data.insert(ENV_FLOAT.to_string(), float_value.to_string());
+
+        let mut expected = HashMap::new();
+
+        expected.insert(
+            ENV_INTEGER_PORT_MIN_MAX.to_string(),
+            ProductConfigResult::Valid(port.to_string()),
+        );
+        expected.insert(
+            ENV_SSL_CERTIFICATE_PATH.to_string(),
+            ProductConfigResult::Valid(certificate_path.to_string()),
+        );
+        expected.insert(
+            ENV_SSL_ENABLED.to_string(),
+            ProductConfigResult::Valid(ssl_enabled.to_string()),
+        );
+        expected.insert(
+            ENV_FLOAT.to_string(),
+            ProductConfigResult::Valid(float_value.to_string()),
+        );
+
+        (data, expected)
+    }
+
+    #[rstest(
+        version,
+        kind,
+        role,
+        user_data,
+        expected,
+        case(
+            VERSION_0_5_0,
+            &OptionKind::Conf(CONF_FILE.to_string()),
+            Some(ROLE_1),
+            create_empty_data_and_expect().0,
+            create_empty_data_and_expect().1,
+        ),
+        case(
+            VERSION_0_5_0,
+            &OptionKind::Conf(CONF_FILE.to_string()),
+            Some(ROLE_1),
+            create_correct_data_and_expect().0,
+            create_correct_data_and_expect().1,
+        ),
+    ::trace
+    )]
+    fn test_get_kind_conf_role_1(
+        version: &str,
+        kind: &OptionKind,
+        role: Option<&str>,
+        user_data: HashMap<String, String>,
+        expected: HashMap<String, ProductConfigResult>,
+    ) {
         let config = ProductConfig::new(ConfigJsonReader::new("data/test_config.json")).unwrap();
 
-        let mut test_data = HashMap::new();
-        test_data.insert(
-            "ENV_VAR_INTEGER_PORT_MIN_MAX".to_string(),
-            "123456".to_string(),
-        );
-        test_data.insert("ENV_PROPERTY_STRING_MEMORY".to_string(), "1g".to_string());
+        let result = config.get(version, kind, role, &user_data);
 
-        test_data.insert(
-            "ENV_SSL_CERTIFICATE_PATH".to_string(),
-            "/tmp/ssl_key.xyz".to_string(),
-        );
-
-        let temp = config.get(
-            "0.5.0",
-            &OptionKind::Conf("env.sh".to_string()),
-            Some("role_1"),
-            &test_data,
-        );
-
-        println!("Size: {}", temp.len());
-        for x in temp {
+        println!("Size: {}", result.len());
+        for x in &result {
             println!("{:?}", x)
         }
+
+        assert_eq!(result, expected);
     }
 
     #[test]

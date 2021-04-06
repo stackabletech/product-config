@@ -59,7 +59,8 @@
       },
       {
         "name": "time",
-        "regex": "(^\\p{N}+)(?:\\s*)((?:ns|mus|ms|s|m|min|h|d)\\b$)"
+        "regex": "(^\\p{N}+)(?:\\s*)((?:ns|mus|ms|s|m|h|d)\\b$)",
+        "examples": ["100ms", "60m", "12h"]
       },
       {
         "name": "number",
@@ -75,7 +76,7 @@
     {
       "option_names": [
         {
-          "name": "ENV_VAR_INTEGER_PORT_MIN_MAX",
+          "name": "ENV_INTEGER_PORT_MIN_MAX",
           "kind": {
             "type": "conf",
             "file": "env.sh"
@@ -127,7 +128,7 @@
     {
       "option_names": [
         {
-          "name": "ENV_VAR_FLOAT",
+          "name": "ENV_FLOAT",
           "kind": {
             "type": "conf",
             "file": "env.sh"
@@ -258,7 +259,7 @@
     {
       "option_names": [
         {
-          "name": "ENV_VAR_ALLOWED_VALUES",
+          "name": "ENV_ALLOWED_VALUES",
           "kind": {
             "type": "conf",
             "file": "env.sh"
@@ -303,7 +304,7 @@
     {
       "option_names": [
         {
-          "name": "ENV_VAR_SECURITY",
+          "name": "ENV_SECURITY",
           "kind": {
             "type": "conf",
             "file": "env.sh"
@@ -342,7 +343,7 @@
     {
       "option_names": [
         {
-          "name": "ENV_VAR_SECURITY_PASSWORD",
+          "name": "ENV_SECURITY_PASSWORD",
           "kind": {
             "type": "conf",
             "file": "env.sh"
@@ -365,7 +366,7 @@
         {
           "option_names": [
             {
-              "name": "ENV_VAR_SECURITY",
+              "name": "ENV_SECURITY",
               "kind": {
                 "type": "conf",
                 "file": "env.sh"
