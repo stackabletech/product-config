@@ -31,7 +31,7 @@ pub fn validate(
     product_version: &str,
     role: Option<&str>,
     option_name: &OptionName,
-    option_value: &String,
+    option_value: &str,
 ) -> ProductConfigResult {
     // a missing / wrong config option stops us from doing any other validation
     let config_option = match config_options.get(&option_name) {
@@ -81,7 +81,7 @@ pub fn validate(
             Some(err) => {
                 return match err {
                     Error::ConfigDependencyValueMissing { .. } => {
-                        ProductConfigResult::Warn(option_value.clone(), err)
+                        ProductConfigResult::Warn(option_value.to_string(), err)
                     }
                     _ => ProductConfigResult::Error(err),
                 }
@@ -91,7 +91,7 @@ pub fn validate(
 
     let check_role = check_role(option_name, &config_option.roles, role);
     if check_role.is_err() {
-        return ProductConfigResult::Warn(option_value.clone(), check_role.err().unwrap());
+        return ProductConfigResult::Warn(option_value.to_string(), check_role.err().unwrap());
     }
 
     // was provided by recommended value?
@@ -103,7 +103,7 @@ pub fn validate(
             product_version,
         )
     {
-        return ProductConfigResult::Recommended(option_value.clone());
+        return ProductConfigResult::Recommended(option_value.to_string());
     }
 
     // was provided by default value?
@@ -115,10 +115,10 @@ pub fn validate(
             product_version,
         )
     {
-        return ProductConfigResult::Default(option_value.clone());
+        return ProductConfigResult::Default(option_value.to_string());
     }
 
-    ProductConfigResult::Valid(option_value.clone())
+    ProductConfigResult::Valid(option_value.to_string())
 }
 
 /// Check if the final used value corresponds to e.g. recommended or default values
@@ -132,13 +132,13 @@ pub fn validate(
 ///
 fn check_option_value_used(
     option_name: &OptionName,
-    option_value: &String,
+    option_value: &str,
     option_values: &Option<Vec<OptionValue>>,
     product_version: &str,
 ) -> ConfigValidationResult<bool> {
     if let Some(values) = option_values {
         let val = util::filter_option_value_for_version(option_name, values, product_version)?;
-        if &val.value == option_value {
+        if val.value == option_value {
             return Ok(true);
         }
     }
@@ -303,7 +303,7 @@ fn check_dependencies(
 fn check_datatype(
     config_setting_units: &HashMap<String, Regex>,
     option_name: &OptionName,
-    option_value: &String,
+    option_value: &str,
     datatype: &Datatype,
 ) -> ConfigValidationResult<()> {
     match datatype {
