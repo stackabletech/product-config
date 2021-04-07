@@ -1,3 +1,4 @@
+use crate::types::OptionValue;
 use crate::OptionName;
 
 /// error definitions
@@ -41,7 +42,7 @@ pub enum Error {
     #[error("No roles in '{name}' match the provided role: '{role}'")]
     ConfigOptionRoleNotFound { name: OptionName, role: String },
 
-    #[error("No roles in provided for '{name}' ")]
+    #[error("No config option roles provided for '{name}' ")]
     ConfigOptionRoleNotProvided { name: OptionName },
 
     #[error("No role was provided by user for '{name}' ")]
@@ -56,6 +57,13 @@ pub enum Error {
 
     #[error("[{option_name}]: provided config value missing")]
     ConfigValueMissing { option_name: OptionName },
+
+    #[error("[{option_name}]: provided config value(s) missing for version '{version}'. Got: {option_values:?}")]
+    ConfigValueMissingForVersion {
+        option_name: OptionName,
+        option_values: Vec<OptionValue>,
+        version: String,
+    },
 
     #[error("[{option_name}]: value '{value}' not in allowed values: {allowed_values:?}")]
     ConfigValueNotInAllowedValues {
@@ -127,4 +135,10 @@ pub enum Error {
         user_value: String,
         required_value: String,
     },
+
+    // for config checks
+    #[error(
+    "[{option_name}]: no default or recommended value found. At least one of them should be provided"
+    )]
+    ConfigDefaultAndRecommendedValueMissing { option_name: OptionName },
 }

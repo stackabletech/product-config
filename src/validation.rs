@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use std::fmt::Display;
 use std::str::FromStr;
 
-type ConfigValidationResult<T> = Result<T, Error>;
+pub type ConfigValidationResult<T> = Result<T, Error>;
 
 /// Returns the provided option_value if no validation errors appear
 ///
@@ -118,6 +118,79 @@ pub fn validate(
     }
 
     ProductConfigResult::Valid(option_value.to_string())
+}
+
+/// Check if the provided config item is correct.
+/// Check if default / recommended values are provided
+/// Check if these values match unit regex etc.
+///
+pub fn validate_config_options(
+    config_options: &HashMap<OptionName, ConfigOption>,
+    config_setting_units: &HashMap<String, Regex>,
+) -> ConfigValidationResult<()> {
+    for (name, option) in config_options {
+        // 1) check for default values
+        if let Some(values) = &option.default_values {
+            // 1.1) check if a provided default version matches as_of_version
+            util::filter_option_value_for_version(name, values, &option.as_of_version)?;
+
+            for val in values {
+                // 1.2) check if default matches the allowed values
+                check_allowed_values(name, &val.value, &option.allowed_values)?;
+                // 1.2) check if default values match datatype (min, max, unit...)
+                check_datatype(config_setting_units, name, &val.value, &option.datatype)?
+            }
+        }
+
+        // 2) check for recommended values
+        if let Some(values) = &option.recommended_values {
+            // 2.1) check if a provided recommended version matches as_of_version
+            util::filter_option_value_for_version(name, values, &option.as_of_version)?;
+
+            for val in values {
+                // 2.2) check if recommended matches the allowed values
+                check_allowed_values(name, &val.value, &option.allowed_values)?;
+                // 2.3) check if recommended values match datatype (min, max, unit...)
+                check_datatype(config_setting_units, name, &val.value, &option.datatype)?
+            }
+        }
+
+        // prepare "user" data
+        let mut user_data = HashMap::new();
+        if let Some(dependencies) = &option.depends_on {
+            for dependency in dependencies {
+                for dep_name in &dependency.option_names {
+                    if let Some(dependency_option) = config_options.get(dep_name) {
+                        if let Some(dependency_option_recommended) =
+                            &dependency_option.recommended_values
+                        {
+                            let filtered_value = util::filter_option_value_for_version(
+                                &dep_name,
+                                dependency_option_recommended,
+                                &option.as_of_version,
+                            )?;
+
+                            user_data.insert(dep_name.name.clone(), filtered_value.value.clone());
+                        }
+                    } else {
+                        return Err(Error::ConfigDependencyMissing {
+                            option_name: name.clone(),
+                            dependency: dependency.option_names.clone(),
+                        });
+                    }
+                }
+            }
+        }
+        // 3) check if dependency values are available and the recommended value matches the required one
+        check_dependencies(name, option, &user_data)?;
+
+        // 4) check if role available
+        if option.roles.is_none() {
+            return Err(Error::ConfigOptionRoleNotProvided { name: name.clone() });
+        }
+    }
+
+    Ok(())
 }
 
 /// Check if the final used value corresponds to e.g. recommended or default values

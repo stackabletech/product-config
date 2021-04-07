@@ -75,7 +75,7 @@ pub struct Unit {
 }
 
 /// Represents the default value a config option may have: since default values may change with different releases, optional from and to version parameters can be provided
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Deserialize, Clone, Debug, Eq, PartialOrd, PartialEq)]
 pub struct OptionValue {
     pub from_version: Option<String>,
     pub to_version: Option<String>,

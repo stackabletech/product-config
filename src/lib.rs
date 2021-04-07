@@ -3,13 +3,14 @@
 //! Validation of configuration options and values in terms of:
 //! - matching data types (e.g. integer, bool, string...)
 //! - minimal and maximal possible values
-//! - regex expressions for different units
+//! - regex expressions for different units like port, url, ip etc.
 //! - version and deprecated checks
-//! - support for default values depending on version
+//! - support for default and recommended values depending on version
+//! - dependency checks for values that require other values to be set to a certain value
 //!   
 //! Additional information like web links or descriptions
 //!
-//! The product config is build from e.g. a JSON file like in the example below:
+//! For now, the product config is build from e.g. a JSON file like "../data/test_config.json":
 //! - The whole example is defined as ConfigItem and is split into config_settings and config_options
 //!   * config_settings contains additional information (e.g. like unit and respective regex patterns)
 //!   * config_options contains all the possible configuration options including all the know how for validation
@@ -27,6 +28,7 @@ use std::string::String;
 use crate::error::Error;
 use crate::reader::ConfigReader;
 use crate::types::{ConfigItem, ConfigOption, OptionKind, OptionName};
+use crate::validation::ConfigValidationResult;
 use regex::Regex;
 
 #[derive(Clone, Debug, PartialOrd, PartialEq)]
@@ -63,9 +65,18 @@ impl ProductConfig {
     ///
     /// * `config_reader` - config_reader implementation
     ///
-    pub fn new<CR: ConfigReader<ConfigItem>>(config_reader: CR) -> Result<Self, Error> {
+    pub fn new<CR: ConfigReader<ConfigItem>>(config_reader: CR) -> ConfigValidationResult<Self> {
         let config = config_reader.read()?;
-        parse_config(&config)
+        let product_config = parse_config(&config);
+        match &product_config {
+            Ok(conf) => validation::validate_config_options(
+                &conf.config_options,
+                &conf.config_setting_units,
+            )?,
+            Err(err) => return Err(err.clone()),
+        }
+
+        product_config
     }
 
     /// Retrieve and check config options depending on the kind (e.g. env, conf), the required config file
@@ -172,7 +183,7 @@ impl ProductConfig {
 ///
 /// * `config` - the current product / controller version
 ///
-fn parse_config(config: &ConfigItem) -> Result<ProductConfig, Error> {
+fn parse_config(config: &ConfigItem) -> ConfigValidationResult<ProductConfig> {
     let mut config_options: HashMap<OptionName, ConfigOption> = HashMap::new();
     // pack config item options via name into hashmap for access
     for config_option in config.config_options.iter() {
@@ -246,11 +257,11 @@ mod tests {
     const VERSION_0_5_0: &str = "0.5.0";
     const CONF_FILE: &str = "env.sh";
 
-    fn create_empty_data_and_expect() -> (
+    fn create_empty_data_and_expected() -> (
         HashMap<String, String>,
         HashMap<String, ProductConfigResult>,
     ) {
-        let ssl_enabled = "false";
+        let ssl_enabled = "true";
         let float_recommended = "50.0";
         let port_recommended = "20000";
 
@@ -263,7 +274,7 @@ mod tests {
         );
         expected.insert(
             ENV_SSL_ENABLED.to_string(),
-            ProductConfigResult::Default(ssl_enabled.to_string()),
+            ProductConfigResult::Recommended(ssl_enabled.to_string()),
         );
         expected.insert(
             ENV_FLOAT.to_string(),
@@ -272,7 +283,7 @@ mod tests {
         (data, expected)
     }
 
-    fn create_correct_data_and_expect() -> (
+    fn create_correct_data_and_expected() -> (
         HashMap<String, String>,
         HashMap<String, ProductConfigResult>,
     ) {
@@ -302,7 +313,7 @@ mod tests {
         );
         expected.insert(
             ENV_SSL_ENABLED.to_string(),
-            ProductConfigResult::Valid(ssl_enabled.to_string()),
+            ProductConfigResult::Recommended(ssl_enabled.to_string()),
         );
         expected.insert(
             ENV_FLOAT.to_string(),
@@ -322,15 +333,15 @@ mod tests {
             VERSION_0_5_0,
             &OptionKind::Conf(CONF_FILE.to_string()),
             Some(ROLE_1),
-            create_empty_data_and_expect().0,
-            create_empty_data_and_expect().1,
+            create_empty_data_and_expected().0,
+            create_empty_data_and_expected().1,
         ),
         case(
             VERSION_0_5_0,
             &OptionKind::Conf(CONF_FILE.to_string()),
             Some(ROLE_1),
-            create_correct_data_and_expect().0,
-            create_correct_data_and_expect().1,
+            create_correct_data_and_expected().0,
+            create_correct_data_and_expected().1,
         ),
     ::trace
     )]

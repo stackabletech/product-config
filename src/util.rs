@@ -1,5 +1,6 @@
 use crate::error::Error;
 use crate::types::{ConfigOption, OptionKind, OptionName, OptionValue};
+use crate::validation::ConfigValidationResult;
 use semver::Version;
 use std::collections::HashMap;
 
@@ -17,7 +18,7 @@ pub fn filter_config_options(
     kind: &OptionKind,
     role: Option<&str>,
     version: &str,
-) -> Result<HashMap<String, String>, Error> {
+) -> ConfigValidationResult<HashMap<String, String>> {
     let mut config_file_options = HashMap::new();
 
     for (option_name, config_option) in config_options {
@@ -34,7 +35,7 @@ pub fn filter_config_options(
             }
         }
 
-        // TODO: What if no recommended or default value provided?
+        // TODO: What if no recommended or default value provided? (-> else )
         if let Some(recommended) = &config_option.recommended_values {
             let option_value = filter_option_value_for_version(option_name, recommended, version)?;
             config_file_options.insert(option_name.name.clone(), option_value.value);
@@ -79,7 +80,7 @@ pub fn filter_option_value_for_version(
     option_name: &OptionName,
     option_values: &[OptionValue],
     version: &str,
-) -> Result<OptionValue, Error> {
+) -> ConfigValidationResult<OptionValue> {
     let product_version = Version::parse(version)?;
 
     for value in option_values {
@@ -102,7 +103,9 @@ pub fn filter_option_value_for_version(
         return Ok(value.clone());
     }
 
-    Err(Error::ConfigValueMissing {
+    Err(Error::ConfigValueMissingForVersion {
         option_name: option_name.clone(),
+        option_values: Vec::from(option_values),
+        version: version.to_string(),
     })
 }
