@@ -120,9 +120,15 @@ pub fn validate(
     ProductConfigResult::Valid(option_value.to_string())
 }
 
-/// Check if the provided config item is correct.
-/// Check if default / recommended values are provided
-/// Check if these values match unit regex etc.
+/// Check if the provided config items are correct. Checks include:
+/// - if default / recommended values match version, min / max, datatype, unit and regex
+/// - if default / recommended values match allowed values if available
+/// - if dependencies and required values match recommended values of that dependency
+/// - if roles are available
+///
+/// # Arguments
+/// * `config_options` - map with OptionName as key and the corresponding ConfigOption as value
+/// * `config_setting_units` - map with unit name and respective regular expression to evaluate the datatype
 ///
 pub fn validate_config_options(
     config_options: &HashMap<OptionName, ConfigOption>,
@@ -137,7 +143,7 @@ pub fn validate_config_options(
             for val in values {
                 // 1.2) check if default matches the allowed values
                 check_allowed_values(name, &val.value, &option.allowed_values)?;
-                // 1.2) check if default values match datatype (min, max, unit...)
+                // 1.3) check if default values match datatype (min, max, unit...)
                 check_datatype(config_setting_units, name, &val.value, &option.datatype)?
             }
         }
