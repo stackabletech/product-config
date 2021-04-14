@@ -1,10 +1,14 @@
 use crate::error::Error;
-use crate::types::{ConfigOption, OptionKind, OptionName, OptionValue};
+use crate::types::{ConfigOption, Dependency, OptionKind, OptionName, OptionValue};
 use crate::validation::ConfigValidationResult;
 use semver::Version;
 use std::collections::HashMap;
 
-/// Check if the final used value corresponds to e.g. recommended or default values.
+/// Collect all config_options that match:
+/// - provided kind
+/// - the controller version
+/// - provided role + required == true (if role is None is wildcard for add all)
+/// - a dependency with a provided value or option that has recommended value
 ///
 /// # Arguments
 ///
@@ -13,7 +17,7 @@ use std::collections::HashMap;
 /// * `role` - the role required / used for the config options
 /// * `version` - the provided product version
 ///
-pub fn filter_config_options(
+pub fn get_matching_config_options(
     config_options: &HashMap<OptionName, ConfigOption>,
     kind: &OptionKind,
     role: Option<&str>,
@@ -22,61 +26,141 @@ pub fn filter_config_options(
     let mut config_file_options = HashMap::new();
 
     for (option_name, config_option) in config_options {
-        // config file matches?
-        if option_name.kind.get_file_name() != kind.get_file_name() {
+        // ignore this option if kind does not match
+        if &option_name.kind != kind {
             continue;
         }
 
-        // role exists and matches?
-        // TODO: Right now, not providing a role is ignored. Throw error?
-        if let Some(role) = role {
-            if !option_role_matches(&config_option, role) {
-                continue;
-            }
+        // ignore if version higher than controller version
+        if Version::parse(config_option.as_of_version.as_str())? > Version::parse(version)? {
+            continue;
         }
 
-        // TODO: What if no recommended or default value provided? (-> else )
-        if let Some(recommended) = &config_option.recommended_values {
-            let option_value = filter_option_value_for_version(option_name, recommended, version)?;
-            config_file_options.insert(option_name.name.clone(), option_value.value);
-        } else if let Some(default) = &config_option.default_values {
-            let option_value = filter_option_value_for_version(option_name, default, version)?;
-            config_file_options.insert(option_name.name.clone(), option_value.value);
+        // ignore completely if role is None
+        // ignore this option if role does not match or is not required
+        if let Some(config_option_roles) = &config_option.roles {
+            for config_option_role in config_option_roles {
+                // role found?
+                if Some(config_option_role.name.as_str()) == role && config_option_role.required {
+                    // check for recommended value and matching version
+                    if let Some(recommended) = &config_option.recommended_values {
+                        let option_value =
+                            get_option_value_for_version(option_name, recommended, version)?;
+
+                        config_file_options.insert(option_name.name.clone(), option_value.value);
+
+                        // check for dependencies
+                        if let Some(config_option_dependencies) = &config_option.depends_on {
+                            // dependency found
+                            let dependencies = get_config_dependencies_and_values(
+                                config_options,
+                                version,
+                                option_name,
+                                &config_option_dependencies,
+                            )?;
+
+                            config_file_options.extend(dependencies);
+                        }
+                    }
+                }
+            }
         }
     }
 
     Ok(config_file_options)
 }
 
-/// Check if the provided config role matches the "required" config option role
+/// Collect all dependencies that are required because of user config options
 ///
 /// # Arguments
 ///
-/// * `config_options` - map with (defined) config option names and the respective config_option
-/// * `role` - the role required / used for the config options
+/// * `config_options` - map with OptionName as key and the corresponding ConfigOption as value
+/// * `user_config` - map with the user config names and according values
+/// * `version` - the provided controller version
+/// * `kind` - config kind provided by the user -> relate to config_option.option_name.kind
 ///
-pub fn option_role_matches(config_option: &ConfigOption, user_role: &str) -> bool {
-    let mut role_match = false;
-    if let Some(roles) = &config_option.roles {
-        for role in roles {
-            if role.required && role.name == user_role {
-                role_match = true;
-                break;
+pub fn get_matching_dependencies(
+    config_options: &HashMap<OptionName, ConfigOption>,
+    user_config: &HashMap<String, String>,
+    version: &str,
+    kind: &OptionKind,
+) -> ConfigValidationResult<HashMap<String, String>> {
+    let mut user_dependencies = HashMap::new();
+    for name in user_config.keys() {
+        let option_name = OptionName {
+            name: name.clone(),
+            kind: kind.clone(),
+        };
+
+        if let Some(option) = config_options.get(&option_name) {
+            if let Some(dependencies) = &option.depends_on {
+                user_dependencies.extend(get_config_dependencies_and_values(
+                    config_options,
+                    version,
+                    &option_name,
+                    dependencies,
+                )?);
             }
         }
     }
-    role_match
+
+    Ok(user_dependencies)
+}
+
+/// Collect all dependencies for required config options and extract a value from either
+/// the dependency itself, or if not available the recommended value of the dependant
+/// dependency config option
+///
+/// # Arguments
+///
+/// * `config_options` - map with OptionName as key and the corresponding ConfigOption as value
+/// * `version` - the provided product version
+/// * `option_name` - name of the config option
+/// * `option_dependencies` - the dependencies of the option to check
+///
+fn get_config_dependencies_and_values(
+    config_options: &HashMap<OptionName, ConfigOption>,
+    version: &str,
+    option_name: &OptionName,
+    option_dependencies: &[Dependency],
+) -> ConfigValidationResult<HashMap<String, String>> {
+    let mut dependencies = HashMap::new();
+    for option_dependency in option_dependencies {
+        for dependency_option_name in &option_dependency.option_names {
+            // the dependency should not differ in the kind
+            if option_name.kind == dependency_option_name.kind {
+                // if the dependency has a proposed value we are done
+                if let Some(dependency_value) = &option_dependency.value {
+                    dependencies.insert(
+                        dependency_option_name.name.clone(),
+                        dependency_value.clone(),
+                    );
+                }
+                // we check the dependency for a recommended value
+                if let Some(dependency_config_option) = config_options.get(dependency_option_name) {
+                    if let Some(recommended) = &dependency_config_option.recommended_values {
+                        let recommended_value =
+                            get_option_value_for_version(option_name, recommended, version)?;
+                        dependencies
+                            .insert(dependency_option_name.name.clone(), recommended_value.value);
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(dependencies)
 }
 
 /// Get the correct value from recommended / default values depending on the version
 ///
 /// # Arguments
 ///
-/// * `option_name` - name of the config option (config property or environmental variable)
+/// * `option_name` - name of the config option
 /// * `option_values` - list of option values and their respective versions
 /// * `version` - product / controller version
 ///
-pub fn filter_option_value_for_version(
+pub fn get_option_value_for_version(
     option_name: &OptionName,
     option_values: &[OptionValue],
     version: &str,

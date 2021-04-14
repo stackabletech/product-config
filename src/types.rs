@@ -83,7 +83,7 @@ pub struct OptionValue {
 }
 
 /// Represents all supported data types
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Deserialize, Clone, Debug, Eq, PartialOrd, PartialEq)]
 #[serde(rename_all = "lowercase", tag = "type")]
 pub enum Datatype {
     Bool,
@@ -117,7 +117,7 @@ pub enum Datatype {
 
 /// Represents a dependency on another config option and (if available) a required value
 /// e.g. to set ssl certificates one has to set some property use_ssl to true
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Deserialize, Clone, Debug, Eq, PartialOrd, PartialEq)]
 pub struct Dependency {
     pub option_names: Vec<OptionName>,
     pub value: Option<String>,
@@ -125,7 +125,7 @@ pub struct Dependency {
 
 /// Represents a role in the cluster, e.g. Server / Client and if the
 /// config option is required
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Deserialize, Clone, Debug, Eq, PartialOrd, PartialEq)]
 pub struct Role {
     pub name: String,
     pub required: bool,

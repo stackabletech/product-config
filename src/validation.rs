@@ -138,7 +138,7 @@ pub fn validate_config_options(
         // 1) check for default values
         if let Some(values) = &option.default_values {
             // 1.1) check if a provided default version matches as_of_version
-            util::filter_option_value_for_version(name, values, &option.as_of_version)?;
+            util::get_option_value_for_version(name, values, &option.as_of_version)?;
 
             for val in values {
                 // 1.2) check if default matches the allowed values
@@ -151,7 +151,7 @@ pub fn validate_config_options(
         // 2) check for recommended values
         if let Some(values) = &option.recommended_values {
             // 2.1) check if a provided recommended version matches as_of_version
-            util::filter_option_value_for_version(name, values, &option.as_of_version)?;
+            util::get_option_value_for_version(name, values, &option.as_of_version)?;
 
             for val in values {
                 // 2.2) check if recommended matches the allowed values
@@ -170,7 +170,7 @@ pub fn validate_config_options(
                         if let Some(dependency_option_recommended) =
                             &dependency_option.recommended_values
                         {
-                            let filtered_value = util::filter_option_value_for_version(
+                            let filtered_value = util::get_option_value_for_version(
                                 &dep_name,
                                 dependency_option_recommended,
                                 &option.as_of_version,
@@ -215,7 +215,7 @@ fn check_option_value_used(
     product_version: &str,
 ) -> ConfigValidationResult<bool> {
     if let Some(values) = option_values {
-        let val = util::filter_option_value_for_version(option_name, values, product_version)?;
+        let val = util::get_option_value_for_version(option_name, values, product_version)?;
         if val.value == option_value {
             return Ok(true);
         }
@@ -224,11 +224,11 @@ fn check_option_value_used(
     Ok(false)
 }
 
-/// Check if config option version is supported or deprecated regarding the product version
+/// Check if config option role is available
 ///
 /// # Arguments
 ///
-/// * `option_name` - name of the config option (config property or environmental variable)
+/// * `option_name` - name of the config option
 /// * `option_config_roles` - config roles provided in the option definition
 /// * `config_role` - config role provided by the user
 ///
@@ -251,7 +251,7 @@ fn check_role(
 
     if let (Some(roles), Some(user_role)) = (option_config_roles, config_role) {
         for role in roles {
-            if role.name == user_role && role.required {
+            if role.name == user_role {
                 return Ok(());
             }
         }
@@ -264,9 +264,10 @@ fn check_role(
 }
 
 /// Check if config option version is supported or deprecated regarding the product version
+///
 /// # Arguments
 ///
-/// * `option_name` - name of the config option (config property or environmental variable)
+/// * `option_name` - name of the config option
 /// * `product_version` - product / controller version
 /// * `option_version` - as of version of the provided config option
 /// * `deprecated_since` - version from which point onwards the option is deprecated
@@ -629,12 +630,12 @@ mod tests {
     use rstest::*;
     use std::collections::HashMap;
 
-    const ENV_VAR_INTEGER_PORT_MIN_MAX: &str = "ENV_VAR_INTEGER_PORT_MIN_MAX";
+    const ENV_INTEGER_PORT_MIN_MAX: &str = "ENV_INTEGER_PORT_MIN_MAX";
     const ENV_PROPERTY_STRING_MEMORY: &str = "ENV_PROPERTY_STRING_MEMORY";
     const ENV_SSL_CERTIFICATE_PATH: &str = "ENV_SSL_CERTIFICATE_PATH";
     const ENV_SSL_ENABLED: &str = "ENV_SSL_ENABLED";
     const CONF_SSL_ENABLED: &str = "conf.ssl.enabled";
-    const ENV_VAR_ALLOWED_VALUES: &str = "ENV_VAR_ALLOWED_VALUES";
+    const ENV_ALLOWED_VALUES: &str = "ENV_ALLOWED_VALUES";
     const ENV_VAR_FLOAT: &str = "ENV_VAR_FLOAT";
 
     const CONFIG_FILE: &str = "env.sh";
@@ -662,10 +663,10 @@ mod tests {
         option_version,
         deprecated_since,
         expected,
-        case(get_conf_option_name(ENV_VAR_INTEGER_PORT_MIN_MAX, CONFIG_FILE), V_1_0_0, V_0_5_0, None, Ok(())),
-        case(get_conf_option_name(ENV_VAR_INTEGER_PORT_MIN_MAX, CONFIG_FILE), V_0_1_0, V_1_0_0, Some(V_0_5_0.to_string()),
+        case(get_conf_option_name(ENV_INTEGER_PORT_MIN_MAX, CONFIG_FILE), V_1_0_0, V_0_5_0, None, Ok(())),
+        case(get_conf_option_name(ENV_INTEGER_PORT_MIN_MAX, CONFIG_FILE), V_0_1_0, V_1_0_0, Some(V_0_5_0.to_string()),
             Err(Error::VersionNotSupported { option_name: option_name.clone(), product_version: V_0_1_0.to_string(), required_version: V_1_0_0.to_string() })),
-        case(get_conf_option_name(ENV_VAR_INTEGER_PORT_MIN_MAX, CONFIG_FILE), V_1_5_0, V_0_5_0, Some(V_1_0_0.to_string()),
+        case(get_conf_option_name(ENV_INTEGER_PORT_MIN_MAX, CONFIG_FILE), V_1_5_0, V_0_5_0, Some(V_1_0_0.to_string()),
             Err(Error::VersionDeprecated { option_name: option_name.clone(), product_version: V_1_5_0.to_string(), deprecated_version: V_1_0_0.to_string() })),
         ::trace
     )]
@@ -694,19 +695,19 @@ mod tests {
         role,
         expected,
         case(
-            &get_conf_option_name(ENV_VAR_INTEGER_PORT_MIN_MAX, CONFIG_FILE),
+            &get_conf_option_name(ENV_INTEGER_PORT_MIN_MAX, CONFIG_FILE),
             Some(ROLE_1),
             Ok(())
         ),
         case(
-            &get_conf_option_name(ENV_VAR_INTEGER_PORT_MIN_MAX, CONFIG_FILE),
+            &get_conf_option_name(ENV_INTEGER_PORT_MIN_MAX, CONFIG_FILE),
             Some(ROLE_2),
-            Err(Error::ConfigOptionRoleNotFound { name: get_conf_option_name(ENV_VAR_INTEGER_PORT_MIN_MAX, CONFIG_FILE), role: ROLE_2.to_string() })
+            Ok(())
         ),
         case(
-            &get_conf_option_name(ENV_VAR_INTEGER_PORT_MIN_MAX, CONFIG_FILE),
+            &get_conf_option_name(ENV_INTEGER_PORT_MIN_MAX, CONFIG_FILE),
             None,
-            Err(Error::ConfigOptionRoleNotProvidedByUser { name: get_conf_option_name(ENV_VAR_INTEGER_PORT_MIN_MAX, CONFIG_FILE) })
+            Err(Error::ConfigOptionRoleNotProvidedByUser { name: get_conf_option_name(ENV_INTEGER_PORT_MIN_MAX, CONFIG_FILE) })
         ),
         ::trace
     )]
@@ -799,22 +800,22 @@ mod tests {
         datatype,
         expected,
         case(
-            &get_conf_option_name(ENV_VAR_INTEGER_PORT_MIN_MAX, CONFIG_FILE),
+            &get_conf_option_name(ENV_INTEGER_PORT_MIN_MAX, CONFIG_FILE),
             PORT_CORRECT,
             &Datatype::Integer{ min: Some(MIN_PORT.to_string()), max: Some(MAX_PORT.to_string()), unit: Some("port".to_string()), accepted_units: None, default_unit:None },
             Ok(())
         ),
         case(
-            &get_conf_option_name(ENV_VAR_INTEGER_PORT_MIN_MAX, CONFIG_FILE),
+            &get_conf_option_name(ENV_INTEGER_PORT_MIN_MAX, CONFIG_FILE),
             PORT_BAD_DATATYPE,
             &Datatype::Integer{ min: Some(MIN_PORT.to_string()), max: Some(MAX_PORT.to_string()), unit: Some("port".to_string()), accepted_units: None, default_unit:None },
-            Err(Error::DatatypeNotMatching { option_name: get_conf_option_name(ENV_VAR_INTEGER_PORT_MIN_MAX, CONFIG_FILE), value: PORT_BAD_DATATYPE.to_string(), datatype: "i64".to_string() })
+            Err(Error::DatatypeNotMatching { option_name: get_conf_option_name(ENV_INTEGER_PORT_MIN_MAX, CONFIG_FILE), value: PORT_BAD_DATATYPE.to_string(), datatype: "i64".to_string() })
         ),
         case(
-            &get_conf_option_name(ENV_VAR_INTEGER_PORT_MIN_MAX, CONFIG_FILE),
+            &get_conf_option_name(ENV_INTEGER_PORT_MIN_MAX, CONFIG_FILE),
             PORT_OUT_OF_BOUNDS,
             &Datatype::Integer{ min: Some(MIN_PORT.to_string()), max: Some(MAX_PORT.to_string()), unit: Some("port".to_string()), accepted_units: None, default_unit:None },
-            Err(Error::ConfigValueOutOfBounds { option_name: get_conf_option_name(ENV_VAR_INTEGER_PORT_MIN_MAX, CONFIG_FILE), received: PORT_OUT_OF_BOUNDS.to_string(), expected: MAX_PORT.to_string() })
+            Err(Error::ConfigValueOutOfBounds { option_name: get_conf_option_name(ENV_INTEGER_PORT_MIN_MAX, CONFIG_FILE), received: PORT_OUT_OF_BOUNDS.to_string(), expected: MAX_PORT.to_string() })
         ),
         case(
             &get_conf_option_name(ENV_PROPERTY_STRING_MEMORY, CONFIG_FILE),
@@ -872,17 +873,17 @@ mod tests {
         allowed_values,
         expected,
         case(
-            &get_conf_option_name(ENV_VAR_ALLOWED_VALUES, CONFIG_FILE),
+            &get_conf_option_name(ENV_ALLOWED_VALUES, CONFIG_FILE),
             ALLOWED_VALUE_1,
             Some(vec![ALLOWED_VALUE_1.to_string(), ALLOWED_VALUE_2.to_string(), ALLOWED_VALUE_3.to_string()]),
             Ok(())
         ),
         case(
-            &get_conf_option_name(ENV_VAR_ALLOWED_VALUES, CONFIG_FILE),
+            &get_conf_option_name(ENV_ALLOWED_VALUES, CONFIG_FILE),
             NOT_ALLOWED_VALUE,
             Some(vec![ALLOWED_VALUE_1.to_string(), ALLOWED_VALUE_2.to_string(), ALLOWED_VALUE_3.to_string()]),
             Err(Error::ConfigValueNotInAllowedValues {
-                option_name: get_conf_option_name(ENV_VAR_ALLOWED_VALUES, CONFIG_FILE),
+                option_name: get_conf_option_name(ENV_ALLOWED_VALUES, CONFIG_FILE),
                 value: NOT_ALLOWED_VALUE.to_string(),
                 allowed_values: vec![ALLOWED_VALUE_1.to_string(), ALLOWED_VALUE_2.to_string(), ALLOWED_VALUE_3.to_string() ]
             })

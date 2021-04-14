@@ -1,4 +1,4 @@
-use crate::types::OptionValue;
+use crate::types::{Dependency, OptionValue};
 use crate::OptionName;
 
 /// error definitions
@@ -136,9 +136,9 @@ pub enum Error {
         required_value: String,
     },
 
-    // for config checks
-    #[error(
-    "[{option_name}]: no default or recommended value found. At least one of them should be provided"
-    )]
-    ConfigDefaultAndRecommendedValueMissing { option_name: OptionName },
+    #[error("[{option_name}]: no provided or recommended values in dependency '{dependency:?}'")]
+    ConfigDependencyValueMissing {
+        option_name: OptionName,
+        dependency: Dependency,
+    },
 }

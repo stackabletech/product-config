@@ -166,9 +166,16 @@ impl ProductConfig {
     ) -> HashMap<String, String> {
         let mut merged_config_options = HashMap::new();
 
-        if let Ok(options) = util::filter_config_options(&self.config_options, kind, role, version)
+        if let Ok(options) =
+            util::get_matching_config_options(&self.config_options, kind, role, version)
         {
             merged_config_options.extend(options)
+        }
+
+        if let Ok(dependencies) =
+            util::get_matching_dependencies(&self.config_options, user_config, version, kind)
+        {
+            merged_config_options.extend(dependencies);
         }
 
         merged_config_options.extend(user_config.clone());
@@ -261,7 +268,6 @@ mod tests {
         HashMap<String, String>,
         HashMap<String, ProductConfigResult>,
     ) {
-        let ssl_enabled = "true";
         let float_recommended = "50.0";
         let port_recommended = "20000";
 
@@ -271,10 +277,6 @@ mod tests {
         expected.insert(
             ENV_INTEGER_PORT_MIN_MAX.to_string(),
             ProductConfigResult::Recommended(port_recommended.to_string()),
-        );
-        expected.insert(
-            ENV_SSL_ENABLED.to_string(),
-            ProductConfigResult::Recommended(ssl_enabled.to_string()),
         );
         expected.insert(
             ENV_FLOAT.to_string(),
@@ -298,7 +300,6 @@ mod tests {
             ENV_SSL_CERTIFICATE_PATH.to_string(),
             certificate_path.to_string(),
         );
-        data.insert(ENV_SSL_ENABLED.to_string(), ssl_enabled.to_string());
         data.insert(ENV_FLOAT.to_string(), float_value.to_string());
 
         let mut expected = HashMap::new();

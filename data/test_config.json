@@ -83,7 +83,7 @@
           }
         },
         {
-          "name": "conf.var.integer.port.min.max",
+          "name": "conf.integer.port.min.max",
           "kind": {
             "type": "conf",
             "file": "my.config"
@@ -135,7 +135,7 @@
           }
         },
         {
-          "name": "conf.var.float",
+          "name": "conf.float",
           "kind": {
             "type": "conf",
             "file": "my.config"
@@ -223,10 +223,6 @@
         {
           "name": "role_1",
           "required": false
-        },
-        {
-          "name": "role_2",
-          "required": true
         }
       ],
       "as_of_version": "0.5.0"
@@ -276,7 +272,7 @@
           }
         },
         {
-          "name": "conf.var.allowed.values",
+          "name": "conf.allowed.values",
           "kind": {
             "type": "conf",
             "file": "my.config"
@@ -321,7 +317,7 @@
           }
         },
         {
-          "name": "conf.var.security",
+          "name": "conf.security",
           "kind": {
             "type": "conf",
             "file": "my.config"
@@ -366,7 +362,7 @@
           }
         },
         {
-          "name": "conf.var.security.password",
+          "name": "conf.security.password",
           "kind": {
             "type": "conf",
             "file": "my.config"
@@ -399,7 +395,7 @@
               }
             },
             {
-              "name": "conf.var.security",
+              "name": "conf.security",
               "kind": {
                 "type": "conf",
                 "file": "my.config"
@@ -446,11 +442,11 @@
       "roles": [
         {
           "name": "role_1",
-          "required": true
+          "required": false
         },
         {
           "name": "role_2",
-          "required": true
+          "required": false
         }
       ],
       "as_of_version": "0.5.0"
@@ -479,7 +475,7 @@
         },
         {
           "name": "role_2",
-          "required": true
+          "required": false
         }
       ],
       "datatype": {
