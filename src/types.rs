@@ -17,16 +17,16 @@ pub struct ConfigSetting {
 /// Represents one config option entry for a given property
 #[derive(Deserialize, Clone, Debug)]
 pub struct ConfigOption {
-    pub option_names: Vec<ConfigName>,
+    pub config_names: Vec<ConfigName>,
     pub datatype: Datatype,
-    pub default_values: Option<Vec<OptionValue>>,
-    pub recommended_values: Option<Vec<OptionValue>>,
+    pub default_values: Option<Vec<ConfigValue>>,
+    pub recommended_values: Option<Vec<ConfigValue>>,
     pub allowed_values: Option<Vec<String>>,
     pub as_of_version: String,
     pub deprecated_since: Option<String>,
     pub deprecated_for: Option<Vec<String>>,
-    pub depends_on: Option<Vec<Dependency>>,
-    pub roles: Option<Vec<Role>>,
+    pub depends_on: Option<Vec<ConfigOptionDependency>>,
+    pub roles: Option<Vec<ConfigRole>>,
     pub restart_required: Option<bool>,
     pub tags: Option<Vec<String>>,
     pub additional_doc: Option<Vec<String>>,
@@ -74,9 +74,10 @@ pub struct Unit {
     pub comment: Option<String>,
 }
 
-/// Represents the default value a config option may have: since default values may change with different releases, optional from and to version parameters can be provided
+/// Represents the default or recommended values a config option may have: since default values
+/// may change with different releases, optional from and to version parameters can be provided
 #[derive(Deserialize, Clone, Debug, Eq, PartialOrd, PartialEq)]
-pub struct OptionValue {
+pub struct ConfigValue {
     pub from_version: Option<String>,
     pub to_version: Option<String>,
     pub value: String,
@@ -118,15 +119,15 @@ pub enum Datatype {
 /// Represents a dependency on another config option and (if available) a required value
 /// e.g. to set ssl certificates one has to set some property use_ssl to true
 #[derive(Deserialize, Clone, Debug, Eq, PartialOrd, PartialEq)]
-pub struct Dependency {
-    pub option_names: Vec<ConfigName>,
+pub struct ConfigOptionDependency {
+    pub config_names: Vec<ConfigName>,
     pub value: Option<String>,
 }
 
 /// Represents a role in the cluster, e.g. Server / Client and if the
 /// config option is required
 #[derive(Deserialize, Clone, Debug, Eq, PartialOrd, PartialEq)]
-pub struct Role {
+pub struct ConfigRole {
     pub name: String,
     pub required: bool,
 }

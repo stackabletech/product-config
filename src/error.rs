@@ -1,4 +1,4 @@
-use crate::types::{Dependency, OptionValue};
+use crate::types::{ConfigOptionDependency, ConfigValue};
 use crate::ConfigName;
 
 #[derive(thiserror::Error, Clone, Debug, PartialOrd, PartialEq)]
@@ -57,7 +57,7 @@ pub enum Error {
     #[error("[{option_name}]: provided config value(s) missing for version '{version}'. Got: {option_values:?}")]
     ConfigValueMissingForVersion {
         option_name: ConfigName,
-        option_values: Vec<OptionValue>,
+        option_values: Vec<ConfigValue>,
         version: String,
     },
 
@@ -133,6 +133,6 @@ pub enum Error {
     #[error("[{option_name}]: no provided or recommended values in dependency '{dependency:?}'")]
     ConfigDependencyValueMissing {
         option_name: ConfigName,
-        dependency: Dependency,
+        dependency: ConfigOptionDependency,
     },
 }

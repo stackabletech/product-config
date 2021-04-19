@@ -201,7 +201,7 @@ fn parse_config_spec(config_spec: &ConfigSpec) -> ValidationResult<ProductConfig
     // pack config item options via name into hashmap for access
     for config_option in config_spec.config_options.iter() {
         // for every provided config option name, write config option reference into map
-        for option_name in config_option.option_names.iter() {
+        for option_name in config_option.config_names.iter() {
             config_options.insert(option_name.clone(), config_option.clone());
         }
     }

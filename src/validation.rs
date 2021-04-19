@@ -1,5 +1,5 @@
 use crate::error::Error;
-use crate::types::{ConfigName, ConfigOption, Datatype, OptionValue, Role};
+use crate::types::{ConfigName, ConfigOption, ConfigRole, ConfigValue, Datatype};
 use crate::util;
 use crate::ConfigOptionValidationResult;
 use regex::Regex;
@@ -168,7 +168,7 @@ pub fn validate_config_options(
         let mut user_data = HashMap::new();
         if let Some(dependencies) = &option.depends_on {
             for dependency in dependencies {
-                for dep_name in &dependency.option_names {
+                for dep_name in &dependency.config_names {
                     if let Some(dependency_option) = config_options.get(dep_name) {
                         if let Some(dependency_option_recommended) =
                             &dependency_option.recommended_values
@@ -184,7 +184,7 @@ pub fn validate_config_options(
                     } else {
                         return Err(Error::ConfigDependencyMissing {
                             option_name: name.clone(),
-                            dependency: dependency.option_names.clone(),
+                            dependency: dependency.config_names.clone(),
                         });
                     }
                 }
@@ -214,7 +214,7 @@ pub fn validate_config_options(
 fn check_option_value_used(
     option_name: &ConfigName,
     option_value: &str,
-    option_values: &Option<Vec<OptionValue>>,
+    option_values: &Option<Vec<ConfigValue>>,
     product_version: &Version,
 ) -> ValidationResult<bool> {
     if let Some(values) = option_values {
@@ -237,7 +237,7 @@ fn check_option_value_used(
 ///
 fn check_role(
     option_name: &ConfigName,
-    option_config_roles: &Option<Vec<Role>>,
+    option_config_roles: &Option<Vec<ConfigRole>>,
     config_role: Option<&str>,
 ) -> ValidationResult<()> {
     if option_config_roles.is_none() {
@@ -333,7 +333,7 @@ fn check_dependencies(
         // check if we find any matches, otherwise return error after the loop
         let mut found_match = false;
         // for each option name provided within the dependency
-        for dependency_option_name in &config_option_dependency.option_names {
+        for dependency_option_name in &config_option_dependency.config_names {
             if !user_options.contains_key(&dependency_option_name.name) {
                 continue;
             }
@@ -380,7 +380,7 @@ fn check_dependencies(
             // TODO: Error or just add the correct dependency?
             return Err(Error::ConfigDependencyMissing {
                 option_name: option_name.clone(),
-                dependency: config_option_dependency.option_names.clone(),
+                dependency: config_option_dependency.config_names.clone(),
             });
         }
     }
@@ -623,7 +623,7 @@ mod tests {
 
     use crate::error::Error;
     use crate::reader::ConfigJsonReader;
-    use crate::types::{ConfigKind, ConfigName, Datatype, Role};
+    use crate::types::{ConfigKind, ConfigName, ConfigRole, Datatype};
     use crate::validation::{
         check_allowed_values, check_datatype, check_dependencies, check_role,
         check_version_supported_or_deprecated,
@@ -716,11 +716,11 @@ mod tests {
     )]
     fn test_check_role(option_name: &ConfigName, role: Option<&str>, expected: Result<(), Error>) {
         let option_config_roles = Some(vec![
-            Role {
+            ConfigRole {
                 name: ROLE_1.to_string(),
                 required: true,
             },
-            Role {
+            ConfigRole {
                 name: ROLE_2.to_string(),
                 required: false,
             },

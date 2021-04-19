@@ -74,7 +74,7 @@
   },
   "config_options": [
     {
-      "option_names": [
+      "config_names": [
         {
           "name": "ENV_INTEGER_PORT_MIN_MAX",
           "kind": {
@@ -126,7 +126,7 @@
       "as_of_version": "0.5.0"
     },
     {
-      "option_names": [
+      "config_names": [
         {
           "name": "ENV_FLOAT",
           "kind": {
@@ -177,7 +177,7 @@
       "as_of_version": "0.5.0"
     },
     {
-      "option_names": [
+      "config_names": [
         {
           "name": "ENV_PROPERTY_STRING_MEMORY",
           "kind": {
@@ -228,7 +228,7 @@
       "as_of_version": "0.5.0"
     },
     {
-      "option_names": [
+      "config_names": [
         {
           "name": "ENV_PROPERTY_STRING_DEPRECATED",
           "kind": {
@@ -263,7 +263,7 @@
       "deprecated_since": "0.4.0"
     },
     {
-      "option_names": [
+      "config_names": [
         {
           "name": "ENV_ALLOWED_VALUES",
           "kind": {
@@ -308,7 +308,7 @@
       "as_of_version": "0.1.0"
     },
     {
-      "option_names": [
+      "config_names": [
         {
           "name": "ENV_SECURITY",
           "kind": {
@@ -353,7 +353,7 @@
       "restart_required": true
     },
     {
-      "option_names": [
+      "config_names": [
         {
           "name": "ENV_SECURITY_PASSWORD",
           "kind": {
@@ -386,7 +386,7 @@
       "as_of_version": "0.5.0",
       "depends_on": [
         {
-          "option_names": [
+          "config_names": [
             {
               "name": "ENV_SECURITY",
               "kind": {
@@ -408,7 +408,7 @@
       "restart_required": true
     },
     {
-      "option_names": [
+      "config_names": [
         {
           "name": "ENV_SSL_ENABLED",
           "kind": {
@@ -452,7 +452,7 @@
       "as_of_version": "0.5.0"
     },
     {
-      "option_names": [
+      "config_names": [
         {
           "name": "ENV_SSL_CERTIFICATE_PATH",
           "kind": {
@@ -485,7 +485,7 @@
       "as_of_version": "0.5.0",
       "depends_on": [
         {
-          "option_names": [
+          "config_names": [
             {
               "name": "ENV_SSL_ENABLED",
               "kind": {

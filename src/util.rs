@@ -1,5 +1,5 @@
 use crate::error::Error;
-use crate::types::{ConfigKind, ConfigName, ConfigOption, Dependency, OptionValue};
+use crate::types::{ConfigKind, ConfigName, ConfigOption, ConfigOptionDependency, ConfigValue};
 use crate::validation::ValidationResult;
 use semver::Version;
 use std::collections::HashMap;
@@ -12,7 +12,7 @@ use std::collections::HashMap;
 ///
 /// # Arguments
 ///
-/// * `config_options` - map with OptionName as key and the corresponding ConfigOption as value
+/// * `config_options` - map with ConfigName as key and the corresponding ConfigOption as value
 /// * `kind` - config kind provided by the user -> relate to config_option.option_name.kind
 /// * `role` - the role required / used for the config options
 /// * `product_version` - the provided product version
@@ -79,7 +79,7 @@ pub fn get_matching_config_options(
 ///
 /// # Arguments
 ///
-/// * `config_options` - map with OptionName as key and the corresponding ConfigOption as value
+/// * `config_options` - map with ConfigName as key and the corresponding ConfigOption as value
 /// * `user_config` - map with the user config names and according values
 /// * `version` - the provided product version
 /// * `kind` - config kind provided by the user -> relate to config_option.option_name.kind
@@ -118,7 +118,7 @@ pub fn get_matching_dependencies(
 ///
 /// # Arguments
 ///
-/// * `config_options` - map with OptionName as key and the corresponding ConfigOption as value
+/// * `config_options` - map with ConfigName as key and the corresponding ConfigOption as value
 /// * `product_version` - the provided product version
 /// * `option_name` - name of the config option
 /// * `option_dependencies` - the dependencies of the option to check
@@ -127,11 +127,11 @@ fn get_config_dependencies_and_values(
     config_options: &HashMap<ConfigName, ConfigOption>,
     product_version: &Version,
     option_name: &ConfigName,
-    option_dependencies: &[Dependency],
+    option_dependencies: &[ConfigOptionDependency],
 ) -> ValidationResult<HashMap<String, String>> {
     let mut dependencies = HashMap::new();
     for option_dependency in option_dependencies {
-        for dependency_option_name in &option_dependency.option_names {
+        for dependency_option_name in &option_dependency.config_names {
             // the dependency should not differ in the kind
             if option_name.kind == dependency_option_name.kind {
                 // if the dependency has a proposed value we are done
@@ -173,9 +173,9 @@ fn get_config_dependencies_and_values(
 ///
 pub fn get_option_value_for_version(
     option_name: &ConfigName,
-    option_values: &[OptionValue],
+    option_values: &[ConfigValue],
     product_version: &Version,
-) -> ValidationResult<OptionValue> {
+) -> ValidationResult<ConfigValue> {
     for value in option_values {
         if let Some(from) = &value.from_version {
             let from_version = Version::parse(from)?;
