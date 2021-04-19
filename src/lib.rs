@@ -7,13 +7,14 @@
 //! - version and deprecated checks
 //! - support for default and recommended values depending on version
 //! - dependency checks for values that require other values to be set to a certain value
-//!   
-//! Additional information like web links or descriptions
+//! - options can be assigned to certain rules (server, client ...)
+//! - apply mode for config changes (e.g. restart)
+//! - additional information like web links or descriptions
 //!
 //! For now, the product config is build from e.g. a JSON file like "../data/test_config.json":
-//! - The whole example is defined as ConfigItem and is split into config_settings and config_options
-//!   * config_settings contains additional information (e.g. like unit and respective regex patterns)
-//!   * config_options contains all the possible configuration options including all the know how for validation
+//! The JSON example is defined as ConfigItem and is split into config_settings and config_options
+//!  - config_settings contains additional information (e.g. like unit and respective regex patterns)
+//!  - config_options contains all the possible configuration options including all the know how for validation
 //!
 pub mod error;
 pub mod reader;
@@ -27,20 +28,21 @@ use std::string::String;
 
 use crate::error::Error;
 use crate::reader::ConfigReader;
-use crate::types::{ConfigItem, ConfigOption, OptionKind, OptionName};
-use crate::validation::ConfigValidationResult;
+use crate::types::{ConfigKind, ConfigName, ConfigOption, ConfigSpec};
+use crate::validation::ValidationResult;
 use regex::Regex;
+use semver::Version;
 
+/// This will be returned for every validated configuration value (including user values
+/// and automatically added values from e.g. dependency, recommended etc.).
 #[derive(Clone, Debug, PartialOrd, PartialEq)]
-#[repr(u8)]
-pub enum ProductConfigResult {
-    /// On Default, the value does not differ from the default settings and may be
+pub enum ConfigOptionValidationResult {
+    /// On Default, the provided value does not differ from the default settings and may be
     /// left out from the user config in the future.
     Default(String),
-    /// On Recommended, the value from the recommended section depending
-    /// on the product version was used. May be because of automatic enhancement,
-    /// matching config file and role etc.
-    Recommended(String),
+    /// On RecommendedDefault, the value for this configuration option is a recommended value.
+    /// Will be returned when the user did not provide a value and the product does not have a default.
+    RecommendedDefault(String),
     /// On Valid, the value passed all checks and can be used.
     Valid(String),
     /// On warn, the value maybe used with caution.
@@ -55,7 +57,7 @@ pub struct ProductConfig {
     // provided config units with corresponding regex pattern
     config_setting_units: HashMap<String, Regex>,
     // option names as key and the corresponding option as value
-    config_options: HashMap<OptionName, ConfigOption>,
+    config_options: HashMap<ConfigName, ConfigOption>,
 }
 
 impl ProductConfig {
@@ -65,28 +67,26 @@ impl ProductConfig {
     ///
     /// * `config_reader` - config_reader implementation
     ///
-    pub fn new<CR: ConfigReader<ConfigItem>>(config_reader: CR) -> ConfigValidationResult<Self> {
+    pub fn new<CR: ConfigReader<ConfigSpec>>(config_reader: CR) -> ValidationResult<Self> {
         let config = config_reader.read()?;
-        let product_config = parse_config(&config);
-        match &product_config {
-            Ok(conf) => validation::validate_config_options(
-                &conf.config_options,
-                &conf.config_setting_units,
-            )?,
-            Err(err) => return Err(err.clone()),
-        }
+        let product_config = parse_config_spec(&config)?;
 
-        product_config
+        validation::validate_config_options(
+            &product_config.config_options,
+            &product_config.config_setting_units,
+        )?;
+
+        Ok(product_config)
     }
 
-    /// Retrieve and check config options depending on the kind (e.g. env, conf), the required config file
-    /// (e.g. environment variables or config properties). Add other provided options that match the
-    /// config kind, config file and config role. Automatically add and correct missing or wrong
-    /// config options and dependencies.
+    /// Retrieve and check config options depending on the config option kind (e.g. env, conf),
+    /// the required config file (e.g. environment variables or config properties).
+    /// Add other provided options that match the config kind, config file and config role.
+    /// Automatically add and correct missing or wrong config options and dependencies.
     ///
     /// # Arguments
     ///
-    /// * `version` - the current product / controller version
+    /// * `version` - the current product version
     /// * `kind` - config kind provided by the user -> relate to config_option.option_name.kind
     /// * `role` - config role provided by the user -> relate to config_option.roles
     /// * `user_config` - map with option name and values (the explicit user config options)
@@ -95,7 +95,7 @@ impl ProductConfig {
     ///
     /// ```
     /// use product_config::reader::ConfigJsonReader;
-    /// use product_config::types::OptionKind;
+    /// use product_config::types::ConfigKind;
     /// use product_config::ProductConfig;
     /// use std::collections::HashMap;
     ///
@@ -107,7 +107,7 @@ impl ProductConfig {
     ///
     /// let env_sh = config.get(
     ///     "0.5.0",
-    ///     &OptionKind::Conf("env.sh".to_string()),
+    ///     &ConfigKind::Conf("env.sh".to_string()),
     ///     Some("role_1"),
     ///     &user_data,
     /// );
@@ -116,17 +116,21 @@ impl ProductConfig {
     pub fn get(
         &self,
         version: &str,
-        kind: &OptionKind,
+        kind: &ConfigKind,
         role: Option<&str>,
         user_config: &HashMap<String, String>,
-    ) -> HashMap<String, ProductConfigResult> {
+    ) -> ValidationResult<HashMap<String, ConfigOptionValidationResult>> {
         let mut result_config = HashMap::new();
 
-        // collect all available options (user and config)
-        let merged_config_options = self.merge_config_options(user_config, version, kind, role);
+        let product_version = Version::parse(version)?;
+
+        // merge provided user options with extracted config options via role / kind and
+        // dependencies to be validated later.
+        let merged_config_options =
+            self.merge_config_options(user_config, &product_version, kind, role);
 
         for (name, option_value) in &merged_config_options {
-            let option_name = &OptionName {
+            let option_name = &ConfigName {
                 name: name.clone(),
                 kind: kind.clone(),
             };
@@ -137,31 +141,32 @@ impl ProductConfig {
                     &self.config_options,
                     &self.config_setting_units,
                     &merged_config_options,
-                    version,
+                    &product_version,
                     role,
                     option_name,
                     option_value,
                 ),
             );
         }
-        result_config
+
+        Ok(result_config)
     }
 
-    /// Merge user config options and available config options depending on kind and role to
-    /// be validated later.
+    /// Merge provided user config options and available config options (from JSON, YAML...)
+    /// depending on kind and role to be validated later.
     ///
     /// # Arguments
     ///
     /// * `user_config` - map with option name and values (the explicit user config options)
-    /// * `version` - the current product / controller version
+    /// * `version` - the current product version
     /// * `kind` - config kind provided by the user -> relate to config_option.option_name.kind
     /// * `role` - config role provided by the user -> relate to config_option.roles
     ///
     fn merge_config_options(
         &self,
         user_config: &HashMap<String, String>,
-        version: &str,
-        kind: &OptionKind,
+        version: &Version,
+        kind: &ConfigKind,
         role: Option<&str>,
     ) -> HashMap<String, String> {
         let mut merged_config_options = HashMap::new();
@@ -184,31 +189,32 @@ impl ProductConfig {
     }
 }
 
-/// Retrieve and check config options depending on the kind (e.g. env, conf), the required config file
+/// Parse the provided config spec. Store config options in a hashmap with the option name
+/// as key. Parse any additional settings like units and the respective regex patterns.
 ///
 /// # Arguments
 ///
-/// * `config` - the current product / controller version
+/// * `config_spec` - the config spec provided by the ConfigReader (JSON, ...)
 ///
-fn parse_config(config: &ConfigItem) -> ConfigValidationResult<ProductConfig> {
-    let mut config_options: HashMap<OptionName, ConfigOption> = HashMap::new();
+fn parse_config_spec(config_spec: &ConfigSpec) -> ValidationResult<ProductConfig> {
+    let mut config_options = HashMap::new();
     // pack config item options via name into hashmap for access
-    for config_option in config.config_options.iter() {
+    for config_option in config_spec.config_options.iter() {
         // for every provided config option name, write config option reference into map
         for option_name in config_option.option_names.iter() {
             config_options.insert(option_name.clone(), config_option.clone());
         }
     }
 
-    let mut config_setting_units: HashMap<String, Regex> = HashMap::new();
+    let mut config_setting_units = HashMap::new();
     // pack unit name and compiled regex pattern into map
-    for unit in &config.config_settings.unit {
-        let config_setting_unit_name = if !unit.name.is_empty() {
-            unit.name.clone()
-        } else {
+    for unit in &config_spec.config_settings.units {
+        let config_setting_unit_name = if unit.name.is_empty() {
             return Err(Error::ConfigSettingNotFound {
                 name: "unit".to_string(),
             });
+        } else {
+            unit.name.clone()
         };
 
         // no regex or empty regex provided
@@ -244,8 +250,8 @@ fn parse_config(config: &ConfigItem) -> ConfigValidationResult<ProductConfig> {
 mod tests {
     use crate::error::Error;
     use crate::reader::ConfigJsonReader;
-    use crate::types::{OptionKind, OptionName};
-    use crate::{ProductConfig, ProductConfigResult};
+    use crate::types::{ConfigKind, ConfigName};
+    use crate::{ConfigOptionValidationResult, ProductConfig};
     use rstest::*;
     use std::collections::HashMap;
 
@@ -266,7 +272,7 @@ mod tests {
 
     fn create_empty_data_and_expected() -> (
         HashMap<String, String>,
-        HashMap<String, ProductConfigResult>,
+        HashMap<String, ConfigOptionValidationResult>,
     ) {
         let float_recommended = "50.0";
         let port_recommended = "20000";
@@ -276,18 +282,18 @@ mod tests {
         let mut expected = HashMap::new();
         expected.insert(
             ENV_INTEGER_PORT_MIN_MAX.to_string(),
-            ProductConfigResult::Recommended(port_recommended.to_string()),
+            ConfigOptionValidationResult::RecommendedDefault(port_recommended.to_string()),
         );
         expected.insert(
             ENV_FLOAT.to_string(),
-            ProductConfigResult::Recommended(float_recommended.to_string()),
+            ConfigOptionValidationResult::RecommendedDefault(float_recommended.to_string()),
         );
         (data, expected)
     }
 
     fn create_correct_data_and_expected() -> (
         HashMap<String, String>,
-        HashMap<String, ProductConfigResult>,
+        HashMap<String, ConfigOptionValidationResult>,
     ) {
         let port = "12345";
         let ssl_enabled = "true";
@@ -306,19 +312,19 @@ mod tests {
 
         expected.insert(
             ENV_INTEGER_PORT_MIN_MAX.to_string(),
-            ProductConfigResult::Valid(port.to_string()),
+            ConfigOptionValidationResult::Valid(port.to_string()),
         );
         expected.insert(
             ENV_SSL_CERTIFICATE_PATH.to_string(),
-            ProductConfigResult::Valid(certificate_path.to_string()),
+            ConfigOptionValidationResult::Valid(certificate_path.to_string()),
         );
         expected.insert(
             ENV_SSL_ENABLED.to_string(),
-            ProductConfigResult::Recommended(ssl_enabled.to_string()),
+            ConfigOptionValidationResult::RecommendedDefault(ssl_enabled.to_string()),
         );
         expected.insert(
             ENV_FLOAT.to_string(),
-            ProductConfigResult::Valid(float_value.to_string()),
+            ConfigOptionValidationResult::Valid(float_value.to_string()),
         );
 
         (data, expected)
@@ -332,14 +338,14 @@ mod tests {
         expected,
         case(
             VERSION_0_5_0,
-            &OptionKind::Conf(CONF_FILE.to_string()),
+            &ConfigKind::Conf(CONF_FILE.to_string()),
             Some(ROLE_1),
             create_empty_data_and_expected().0,
             create_empty_data_and_expected().1,
         ),
         case(
             VERSION_0_5_0,
-            &OptionKind::Conf(CONF_FILE.to_string()),
+            &ConfigKind::Conf(CONF_FILE.to_string()),
             Some(ROLE_1),
             create_correct_data_and_expected().0,
             create_correct_data_and_expected().1,
@@ -348,14 +354,14 @@ mod tests {
     )]
     fn test_get_kind_conf_role_1(
         version: &str,
-        kind: &OptionKind,
+        kind: &ConfigKind,
         role: Option<&str>,
         user_data: HashMap<String, String>,
-        expected: HashMap<String, ProductConfigResult>,
+        expected: HashMap<String, ConfigOptionValidationResult>,
     ) {
         let config = ProductConfig::new(ConfigJsonReader::new("data/test_config.json")).unwrap();
 
-        let result = config.get(version, kind, role, &user_data);
+        let result = config.get(version, kind, role, &user_data).unwrap();
 
         println!("Size: {}", result.len());
         for x in &result {
@@ -367,19 +373,20 @@ mod tests {
 
     #[test]
     fn test_product_config_result_order() {
-        let valid = ProductConfigResult::Valid("valid".to_string());
-        let default = ProductConfigResult::Default("default".to_string());
-        let recommended = ProductConfigResult::Recommended("recommended".to_string());
-        let warn = ProductConfigResult::Warn(
+        let valid = ConfigOptionValidationResult::Valid("valid".to_string());
+        let default = ConfigOptionValidationResult::Default("default".to_string());
+        let recommended =
+            ConfigOptionValidationResult::RecommendedDefault("recommended".to_string());
+        let warn = ConfigOptionValidationResult::Warn(
             "warning".to_string(),
             Error::ConfigOptionNotFound {
-                option_name: OptionName {
+                option_name: ConfigName {
                     name: "test".to_string(),
-                    kind: OptionKind::Conf("my_config".to_string()),
+                    kind: ConfigKind::Conf("my_config".to_string()),
                 },
             },
         );
-        let error = ProductConfigResult::Error(Error::ConfigSettingNotFound {
+        let error = ConfigOptionValidationResult::Error(Error::ConfigSettingNotFound {
             name: "xyz".to_string(),
         });
 

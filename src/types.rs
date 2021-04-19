@@ -3,7 +3,7 @@ use std::fmt;
 
 /// Represents the root element structure of JSON/YAML documents
 #[derive(Deserialize, Debug)]
-pub struct ConfigItem {
+pub struct ConfigSpec {
     pub config_settings: ConfigSetting,
     pub config_options: Vec<ConfigOption>,
 }
@@ -11,13 +11,13 @@ pub struct ConfigItem {
 /// Represents config settings like unit and regex specification
 #[derive(Deserialize, Debug)]
 pub struct ConfigSetting {
-    pub unit: Vec<Unit>,
+    pub units: Vec<Unit>,
 }
 
-/// Represents one config option entry for a given config property or environmental variable
+/// Represents one config option entry for a given property
 #[derive(Deserialize, Clone, Debug)]
 pub struct ConfigOption {
-    pub option_names: Vec<OptionName>,
+    pub option_names: Vec<ConfigName>,
     pub datatype: Datatype,
     pub default_values: Option<Vec<OptionValue>>,
     pub recommended_values: Option<Vec<OptionValue>>,
@@ -36,12 +36,12 @@ pub struct ConfigOption {
 
 /// Represents (one of multiple) unique identifier for a config option depending on the type
 #[derive(Deserialize, Clone, Debug, Hash, Eq, PartialOrd, PartialEq)]
-pub struct OptionName {
+pub struct ConfigName {
     pub name: String,
-    pub kind: OptionKind,
+    pub kind: ConfigKind,
 }
 
-impl fmt::Display for OptionName {
+impl fmt::Display for ConfigName {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.name)
     }
@@ -50,16 +50,16 @@ impl fmt::Display for OptionName {
 /// Represents different config identifier types like config file, environment variable, command line parameter etc.
 #[derive(Deserialize, Clone, Debug, Hash, Eq, PartialOrd, PartialEq)]
 #[serde(tag = "type", content = "file", rename_all = "lowercase")]
-pub enum OptionKind {
+pub enum ConfigKind {
     Conf(String),
     Env,
     Cli,
 }
 
-impl OptionKind {
+impl ConfigKind {
     pub fn get_file_name(&self) -> String {
         match self {
-            OptionKind::Conf(conf) => conf.clone(),
+            ConfigKind::Conf(conf) => conf.clone(),
             _ => "".to_string(),
         }
     }
@@ -119,7 +119,7 @@ pub enum Datatype {
 /// e.g. to set ssl certificates one has to set some property use_ssl to true
 #[derive(Deserialize, Clone, Debug, Eq, PartialOrd, PartialEq)]
 pub struct Dependency {
-    pub option_names: Vec<OptionName>,
+    pub option_names: Vec<ConfigName>,
     pub value: Option<String>,
 }
 

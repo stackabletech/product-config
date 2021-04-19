@@ -1,21 +1,19 @@
-//type ConfigValidatorResult<T> = std::result::Result<T, error::Error>;
-
 use crate::error::Error;
-use crate::types::{ConfigOption, Datatype, OptionName, OptionValue, Role};
+use crate::types::{ConfigName, ConfigOption, Datatype, OptionValue, Role};
 use crate::util;
-use crate::ProductConfigResult;
+use crate::ConfigOptionValidationResult;
 use regex::Regex;
 use semver::Version;
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::str::FromStr;
 
-pub type ConfigValidationResult<T> = Result<T, Error>;
+pub type ValidationResult<T> = Result<T, Error>;
 
 /// Returns the provided option_value if no validation errors appear
 ///
 /// # Arguments
-/// * `config_options` - map with OptionName as key and the corresponding ConfigOption as value
+/// * `config_options` - map with ConfigName as key and the corresponding ConfigOption as value
 /// * `config_setting_units` - map with unit name and respective regular expression to evaluate the datatype
 /// * `merged_config_options` - merged user and config options (matching role, kind etc.)
 /// * `product_version` - version of the currently active product version
@@ -24,18 +22,18 @@ pub type ConfigValidationResult<T> = Result<T, Error>;
 /// * `option_value` - config option value to be validated; Option.None means missing, Option<""> will avoid some checks and set option to empty
 ///
 pub fn validate(
-    config_options: &HashMap<OptionName, ConfigOption>,
+    config_options: &HashMap<ConfigName, ConfigOption>,
     config_setting_units: &HashMap<String, Regex>,
     merged_config_options: &HashMap<String, String>,
-    product_version: &str,
+    product_version: &Version,
     role: Option<&str>,
-    option_name: &OptionName,
+    option_name: &ConfigName,
     option_value: &str,
-) -> ProductConfigResult {
+) -> ConfigOptionValidationResult {
     // a missing / wrong config option stops us from doing any other validation
     let config_option = match config_options.get(&option_name) {
         None => {
-            return ProductConfigResult::Error(Error::ConfigOptionNotFound {
+            return ConfigOptionValidationResult::Error(Error::ConfigOptionNotFound {
                 option_name: option_name.clone(),
             });
         }
@@ -51,7 +49,7 @@ pub fn validate(
     );
 
     if check_version.is_err() {
-        return ProductConfigResult::Error(check_version.err().unwrap());
+        return ConfigOptionValidationResult::Error(check_version.err().unwrap());
     }
 
     // for an empty value (""), ignore checks for the value (check_datatype, check_allowed_values..)
@@ -63,13 +61,13 @@ pub fn validate(
             &config_option.datatype,
         );
         if check_datatype.is_err() {
-            return ProductConfigResult::Error(check_datatype.err().unwrap());
+            return ConfigOptionValidationResult::Error(check_datatype.err().unwrap());
         }
 
         let check_allowed_values =
             check_allowed_values(&option_name, option_value, &config_option.allowed_values);
         if check_allowed_values.is_err() {
-            return ProductConfigResult::Error(check_allowed_values.err().unwrap());
+            return ConfigOptionValidationResult::Error(check_allowed_values.err().unwrap());
         }
     }
 
@@ -80,9 +78,9 @@ pub fn validate(
             Some(err) => {
                 return match err {
                     Error::ConfigDependencyUserValueNotRequired { .. } => {
-                        ProductConfigResult::Warn(option_value.to_string(), err)
+                        ConfigOptionValidationResult::Warn(option_value.to_string(), err)
                     }
-                    _ => ProductConfigResult::Error(err),
+                    _ => ConfigOptionValidationResult::Error(err),
                 }
             }
         }
@@ -90,7 +88,10 @@ pub fn validate(
 
     let check_role = check_role(option_name, &config_option.roles, role);
     if check_role.is_err() {
-        return ProductConfigResult::Warn(option_value.to_string(), check_role.err().unwrap());
+        return ConfigOptionValidationResult::Warn(
+            option_value.to_string(),
+            check_role.err().unwrap(),
+        );
     }
 
     // was provided by recommended value?
@@ -99,10 +100,10 @@ pub fn validate(
             option_name,
             option_value,
             &config_option.recommended_values,
-            product_version,
+            &product_version,
         )
     {
-        return ProductConfigResult::Recommended(option_value.to_string());
+        return ConfigOptionValidationResult::RecommendedDefault(option_value.to_string());
     }
 
     // was provided by default value?
@@ -111,13 +112,13 @@ pub fn validate(
             option_name,
             option_value,
             &config_option.default_values,
-            product_version,
+            &product_version,
         )
     {
-        return ProductConfigResult::Default(option_value.to_string());
+        return ConfigOptionValidationResult::Default(option_value.to_string());
     }
 
-    ProductConfigResult::Valid(option_value.to_string())
+    ConfigOptionValidationResult::Valid(option_value.to_string())
 }
 
 /// Check if the provided config items are correct. Checks include:
@@ -127,18 +128,20 @@ pub fn validate(
 /// - if roles are available
 ///
 /// # Arguments
-/// * `config_options` - map with OptionName as key and the corresponding ConfigOption as value
+/// * `config_options` - map with ConfigName as key and the corresponding ConfigOption as value
 /// * `config_setting_units` - map with unit name and respective regular expression to evaluate the datatype
 ///
 pub fn validate_config_options(
-    config_options: &HashMap<OptionName, ConfigOption>,
+    config_options: &HashMap<ConfigName, ConfigOption>,
     config_setting_units: &HashMap<String, Regex>,
-) -> ConfigValidationResult<()> {
+) -> ValidationResult<()> {
     for (name, option) in config_options {
+        let as_of_version = Version::parse(&option.as_of_version)?;
+
         // 1) check for default values
         if let Some(values) = &option.default_values {
             // 1.1) check if a provided default version matches as_of_version
-            util::get_option_value_for_version(name, values, &option.as_of_version)?;
+            util::get_option_value_for_version(name, values, &as_of_version)?;
 
             for val in values {
                 // 1.2) check if default matches the allowed values
@@ -151,7 +154,7 @@ pub fn validate_config_options(
         // 2) check for recommended values
         if let Some(values) = &option.recommended_values {
             // 2.1) check if a provided recommended version matches as_of_version
-            util::get_option_value_for_version(name, values, &option.as_of_version)?;
+            util::get_option_value_for_version(name, values, &as_of_version)?;
 
             for val in values {
                 // 2.2) check if recommended matches the allowed values
@@ -173,7 +176,7 @@ pub fn validate_config_options(
                             let filtered_value = util::get_option_value_for_version(
                                 &dep_name,
                                 dependency_option_recommended,
-                                &option.as_of_version,
+                                &as_of_version,
                             )?;
 
                             user_data.insert(dep_name.name.clone(), filtered_value.value.clone());
@@ -209,11 +212,11 @@ pub fn validate_config_options(
 /// * `product_version` - the provided product version
 ///
 fn check_option_value_used(
-    option_name: &OptionName,
+    option_name: &ConfigName,
     option_value: &str,
     option_values: &Option<Vec<OptionValue>>,
-    product_version: &str,
-) -> ConfigValidationResult<bool> {
+    product_version: &Version,
+) -> ValidationResult<bool> {
     if let Some(values) = option_values {
         let val = util::get_option_value_for_version(option_name, values, product_version)?;
         if val.value == option_value {
@@ -233,10 +236,10 @@ fn check_option_value_used(
 /// * `config_role` - config role provided by the user
 ///
 fn check_role(
-    option_name: &OptionName,
+    option_name: &ConfigName,
     option_config_roles: &Option<Vec<Role>>,
     config_role: Option<&str>,
-) -> ConfigValidationResult<()> {
+) -> ValidationResult<()> {
     if option_config_roles.is_none() {
         return Err(Error::ConfigOptionRoleNotProvided {
             name: option_name.clone(),
@@ -268,21 +271,20 @@ fn check_role(
 /// # Arguments
 ///
 /// * `option_name` - name of the config option
-/// * `product_version` - product / controller version
+/// * `product_version` - the current product version
 /// * `option_version` - as of version of the provided config option
 /// * `deprecated_since` - version from which point onwards the option is deprecated
 ///
 fn check_version_supported_or_deprecated(
-    option_name: &OptionName,
-    product_version: &str,
+    option_name: &ConfigName,
+    product_version: &Version,
     option_version: &str,
     deprecated_since: &Option<String>,
-) -> ConfigValidationResult<()> {
-    let product_version = Version::parse(product_version)?;
+) -> ValidationResult<()> {
     let option_version = Version::parse(option_version)?;
 
     // compare version of the config option and product / controller version
-    if option_version > product_version {
+    if option_version > *product_version {
         return Err(Error::VersionNotSupported {
             option_name: option_name.clone(),
             product_version: product_version.to_string(),
@@ -294,7 +296,7 @@ fn check_version_supported_or_deprecated(
     if let Some(deprecated) = deprecated_since {
         let deprecated_since_version = Version::parse(deprecated.as_ref())?;
 
-        if deprecated_since_version <= product_version {
+        if deprecated_since_version <= *product_version {
             return Err(Error::VersionDeprecated {
                 option_name: option_name.clone(),
                 product_version: product_version.to_string(),
@@ -316,10 +318,10 @@ fn check_version_supported_or_deprecated(
 /// * `user_options` - map with config option name and potential value provided by user
 ///
 fn check_dependencies(
-    option_name: &OptionName,
+    option_name: &ConfigName,
     config_option: &ConfigOption,
     user_options: &HashMap<String, String>,
-) -> ConfigValidationResult<()> {
+) -> ValidationResult<()> {
     // check if config option has dependencies
     let config_option_dependencies = match &config_option.depends_on {
         None => return Ok(()),
@@ -396,10 +398,10 @@ fn check_dependencies(
 ///
 fn check_datatype(
     config_setting_units: &HashMap<String, Regex>,
-    option_name: &OptionName,
+    option_name: &ConfigName,
     option_value: &str,
     datatype: &Datatype,
-) -> ConfigValidationResult<()> {
+) -> ValidationResult<()> {
     match datatype {
         Datatype::Bool => {
             check_datatype_scalar::<bool>(option_name, option_value, &None, &None)?;
@@ -435,10 +437,10 @@ fn check_datatype(
 /// * `allowed_values` - vector of allowed values
 ///
 fn check_allowed_values(
-    option_name: &OptionName,
+    option_name: &ConfigName,
     option_value: &str,
     allowed_values: &Option<Vec<String>>,
-) -> ConfigValidationResult<()> {
+) -> ValidationResult<()> {
     if allowed_values.is_some() {
         let allowed_values = allowed_values.clone().unwrap();
         if !allowed_values.is_empty() && !allowed_values.contains(&option_value.to_string()) {
@@ -462,11 +464,11 @@ fn check_allowed_values(
 /// * `max` - maximum value specified in config_option.data_format.max
 ///
 fn check_datatype_scalar<T>(
-    option_name: &OptionName,
+    option_name: &ConfigName,
     option_value: &str,
     min: &Option<String>,
     max: &Option<String>,
-) -> ConfigValidationResult<T>
+) -> ValidationResult<T>
 where
     T: FromStr + std::cmp::PartialOrd + Display + Copy,
 {
@@ -493,12 +495,12 @@ where
 ///
 fn check_datatype_string(
     config_setting_units: &HashMap<String, Regex>,
-    option_name: &OptionName,
+    option_name: &ConfigName,
     option_value: &str,
     min: &Option<String>,
     max: &Option<String>,
     unit: &Option<String>,
-) -> ConfigValidationResult<()> {
+) -> ValidationResult<()> {
     let len: usize = option_value.len();
     check_bound::<usize>(option_name, len, min, min_bound)?;
     check_bound::<usize>(option_name, len, max, max_bound)?;
@@ -567,11 +569,11 @@ where
 /// * `check_out_of_bound` - the method to check against the bound
 ///
 fn check_bound<T>(
-    option_name: &OptionName,
+    option_name: &ConfigName,
     value: T,
     bound: &Option<String>,
     check_out_of_bound: fn(T, T) -> bool,
-) -> ConfigValidationResult<T>
+) -> ValidationResult<T>
 where
     T: FromStr + std::cmp::PartialOrd + Display + Copy,
 {
@@ -596,7 +598,7 @@ where
 /// * `option_name` - name of the config option (config property or environmental variable)
 /// * `to_parse` - value to be parsed into a certain T
 ///
-fn parse<T: FromStr>(option_name: &OptionName, to_parse: &str) -> Result<T, Error> {
+fn parse<T: FromStr>(option_name: &ConfigName, to_parse: &str) -> Result<T, Error> {
     match to_parse.parse::<T>() {
         Ok(to_parse) => Ok(to_parse),
         Err(_) => {
@@ -621,13 +623,14 @@ mod tests {
 
     use crate::error::Error;
     use crate::reader::ConfigJsonReader;
-    use crate::types::{Datatype, OptionKind, OptionName, Role};
+    use crate::types::{ConfigKind, ConfigName, Datatype, Role};
     use crate::validation::{
         check_allowed_values, check_datatype, check_dependencies, check_role,
         check_version_supported_or_deprecated,
     };
     use crate::ProductConfig;
     use rstest::*;
+    use semver::Version;
     use std::collections::HashMap;
 
     const ENV_INTEGER_PORT_MIN_MAX: &str = "ENV_INTEGER_PORT_MIN_MAX";
@@ -646,10 +649,10 @@ mod tests {
     const V_0_5_0: &str = "0.5.0";
     const V_0_1_0: &str = "0.1.0";
 
-    fn get_conf_option_name(name: &str, file: &str) -> OptionName {
-        OptionName {
+    fn get_conf_option_name(name: &str, file: &str) -> ConfigName {
+        ConfigName {
             name: name.to_string(),
-            kind: OptionKind::Conf(file.to_string()),
+            kind: ConfigKind::Conf(file.to_string()),
         }
     }
 
@@ -671,7 +674,7 @@ mod tests {
         ::trace
     )]
     fn test_check_version_supported_or_deprecated(
-        option_name: OptionName,
+        option_name: ConfigName,
         product_version: &str,
         option_version: &str,
         deprecated_since: Option<String>,
@@ -679,7 +682,7 @@ mod tests {
     ) {
         let result = check_version_supported_or_deprecated(
             &option_name,
-            product_version,
+            &Version::parse(product_version).unwrap(),
             option_version,
             &deprecated_since,
         );
@@ -711,7 +714,7 @@ mod tests {
         ),
         ::trace
     )]
-    fn test_check_role(option_name: &OptionName, role: Option<&str>, expected: Result<(), Error>) {
+    fn test_check_role(option_name: &ConfigName, role: Option<&str>, expected: Result<(), Error>) {
         let option_config_roles = Some(vec![
             Role {
                 name: ROLE_1.to_string(),
@@ -740,8 +743,8 @@ mod tests {
         Err(Error::ConfigDependencyMissing {
             option_name: get_conf_option_name(ENV_SSL_CERTIFICATE_PATH, CONFIG_FILE),
             dependency: vec![
-                OptionName { name: ENV_SSL_ENABLED.to_string(), kind: OptionKind::Conf(CONFIG_FILE.to_string()) },
-                OptionName { name: CONF_SSL_ENABLED.to_string(), kind: OptionKind::Conf(CONFIG_FILE_2.to_string()) }
+                ConfigName { name: ENV_SSL_ENABLED.to_string(), kind: ConfigKind::Conf(CONFIG_FILE.to_string()) },
+                ConfigName { name: CONF_SSL_ENABLED.to_string(), kind: ConfigKind::Conf(CONFIG_FILE_2.to_string()) }
             ]
         })
     ),
@@ -769,7 +772,7 @@ mod tests {
     ::trace
     )]
     fn test_check_dependencies(
-        option_name: &OptionName,
+        option_name: &ConfigName,
         user_options: HashMap<String, String>,
         expected: Result<(), Error>,
     ) {
@@ -850,7 +853,7 @@ mod tests {
     ::trace
     )]
     fn test_check_datatype(
-        option_name: &OptionName,
+        option_name: &ConfigName,
         option_value: &str,
         datatype: &Datatype,
         expected: Result<(), Error>,
@@ -891,7 +894,7 @@ mod tests {
     ::trace
     )]
     fn test_check_allowed_values(
-        option_name: &OptionName,
+        option_name: &ConfigName,
         option_value: &str,
         allowed_values: Option<Vec<String>>,
         expected: Result<(), Error>,
