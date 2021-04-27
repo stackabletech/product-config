@@ -1,0 +1,3 @@
+= product-config
+
+A library to validate product configuration properties with regard to version, data type, minimum and maximum bounds, dependencies, roles etc.
