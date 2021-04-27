@@ -66,8 +66,8 @@ fn read_file<T: DeserializeOwned>(path: &str) -> Result<T, Error> {
     }
 }
 
-/// Parse the provided config spec. Store config options in a hashmap with the option name
-/// as key. Parse any additional settings like units and the respective regex patterns.
+/// Parse the provided config spec. Store the property spec in a hashmap with the property name
+/// as key and spec as value. Parse any additional settings like units and the respective regex patterns.
 ///
 /// # Arguments
 ///
@@ -111,10 +111,10 @@ fn parse_json_config_spec(
         config_spec_units.insert(unit_name, regex);
     }
 
-    // pack config item options via name into hashmap for access//
+    // pack properties via name into hashmap for easier access
     let mut parsed_property_spec = HashMap::new();
     for property in property_spec {
-        // for every provided config option name, write config option reference into map
+        // for every provided property name, write property name and spec into map
         for property_name in &property.property_names {
             parsed_property_spec.insert(property_name.clone(), property.clone());
         }

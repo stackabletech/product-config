@@ -15,14 +15,14 @@ pub enum Error {
         source: semver::SemVerError,
     },
 
-    #[error("[{property_name}]: current product version is '{product_version}' -> option not supported; available from version '{required_version}'")]
+    #[error("[{property_name}]: current product version is '{product_version}' -> property not supported; available from version '{required_version}'")]
     VersionNotSupported {
         property_name: PropertyName,
         product_version: String,
         required_version: String,
     },
 
-    #[error("[{property_name}]: current product version is '{product_version}' -> option deprecated since version '{deprecated_version}'")]
+    #[error("[{property_name}]: current product version is '{product_version}' -> property deprecated since version '{deprecated_version}'")]
     VersionDeprecated {
         property_name: PropertyName,
         product_version: String,
@@ -38,7 +38,7 @@ pub enum Error {
     #[error("No roles in '{name}' match the provided role: '{role}'")]
     PropertySpecRoleNotFound { name: PropertyName, role: String },
 
-    #[error("No config option roles provided for '{name}' ")]
+    #[error("No property roles provided for '{name}' ")]
     PropertySpecRoleNotProvided { name: PropertyName },
 
     #[error("No role was provided by user for '{name}' ")]

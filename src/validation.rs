@@ -3,7 +3,7 @@ use crate::types::{
     Datatype, ProductConfigSpecProperties, PropertyName, PropertySpec, PropertyValueSpec, Role,
 };
 use crate::util;
-use crate::ConfigOptionValidationResult;
+use crate::PropertyValidationResult;
 use regex::Regex;
 use semver::Version;
 use std::collections::HashMap;
@@ -15,15 +15,15 @@ pub type ValidationResult<T> = Result<T, Error>;
 /// Returns the provided property_value if no validation errors appear
 ///
 /// # Arguments
-/// * `property_spec` - map with PropertyName as key and the corresponding ConfigOption as value
+/// * `property_spec` - map with PropertyName as key and the corresponding PropertySpec as value
 /// * `config_spec` - config spec that contains customizable data like e.g. unit and regex
 /// * `merged_properties` - merged user and property spec (matching role, kind etc.)
 /// * `product_version` - version of the currently active product version
 /// * `role` - the user role to validate against
-/// * `property_name` - name of the config option (config property or environmental variable)
-/// * `property_value` - config option value to be validated; Option.None means missing, Option<""> will avoid some checks and set option to empty
+/// * `property_name` - name of the property
+/// * `property_value` - property value to be validated
 ///
-pub fn validate(
+pub(crate) fn validate(
     property_spec: &HashMap<PropertyName, PropertySpec>,
     config_spec: &ProductConfigSpecProperties,
     merged_properties: &HashMap<String, String>,
@@ -31,18 +31,17 @@ pub fn validate(
     role: Option<&str>,
     property_name: &PropertyName,
     property_value: &str,
-) -> ConfigOptionValidationResult {
-    // a missing / wrong config option stops us from doing any other validation
+) -> PropertyValidationResult {
+    // a missing / wrong property stops us from doing any other validation
     let property = match property_spec.get(&property_name) {
         None => {
-            return ConfigOptionValidationResult::Error(Error::PropertyNotFound {
+            return PropertyValidationResult::Error(Error::PropertyNotFound {
                 property_name: property_name.clone(),
             });
         }
         Some(opt) => opt,
     };
 
-    // checks for config option
     let check_version = check_version_supported_or_deprecated(
         &property_name,
         product_version,
@@ -51,7 +50,7 @@ pub fn validate(
     );
 
     if check_version.is_err() {
-        return ConfigOptionValidationResult::Error(check_version.err().unwrap());
+        return PropertyValidationResult::Error(check_version.err().unwrap());
     }
 
     // for an empty value (""), ignore checks for the value (check_datatype, check_allowed_values..)
@@ -63,13 +62,13 @@ pub fn validate(
             &property.datatype,
         );
         if check_datatype.is_err() {
-            return ConfigOptionValidationResult::Error(check_datatype.err().unwrap());
+            return PropertyValidationResult::Error(check_datatype.err().unwrap());
         }
 
         let check_allowed_values =
             check_allowed_values(&property_name, property_value, &property.allowed_values);
         if check_allowed_values.is_err() {
-            return ConfigOptionValidationResult::Error(check_allowed_values.err().unwrap());
+            return PropertyValidationResult::Error(check_allowed_values.err().unwrap());
         }
     }
 
@@ -80,9 +79,9 @@ pub fn validate(
             Some(err) => {
                 return match err {
                     Error::PropertyDependencyUserValueNotRequired { .. } => {
-                        ConfigOptionValidationResult::Warn(property_value.to_string(), err)
+                        PropertyValidationResult::Warn(property_value.to_string(), err)
                     }
-                    _ => ConfigOptionValidationResult::Error(err),
+                    _ => PropertyValidationResult::Error(err),
                 }
             }
         }
@@ -90,7 +89,7 @@ pub fn validate(
 
     let check_role = check_role(property_name, &property.roles, role);
     if check_role.is_err() {
-        return ConfigOptionValidationResult::Warn(
+        return PropertyValidationResult::Warn(
             property_value.to_string(),
             check_role.err().unwrap(),
         );
@@ -105,7 +104,7 @@ pub fn validate(
             &product_version,
         )
     {
-        return ConfigOptionValidationResult::RecommendedDefault(property_value.to_string());
+        return PropertyValidationResult::RecommendedDefault(property_value.to_string());
     }
 
     // was provided by default value?
@@ -117,10 +116,10 @@ pub fn validate(
             &product_version,
         )
     {
-        return ConfigOptionValidationResult::Default(property_value.to_string());
+        return PropertyValidationResult::Default(property_value.to_string());
     }
 
-    ConfigOptionValidationResult::Valid(property_value.to_string())
+    PropertyValidationResult::Valid(property_value.to_string())
 }
 
 /// Check if the provided property spec is correct. Checks include:
@@ -131,53 +130,53 @@ pub fn validate(
 ///
 /// # Arguments
 /// * `config_spec` - map with unit name and respective regular expression to evaluate the datatype
-/// * `property_spec` - map with PropertyName as key and the corresponding ConfigOption as value
+/// * `property_spec` - map with property name as key and the corresponding property spec as value
 ///
-pub fn validate_config_options(
+pub(crate) fn validate_property_spec(
     config_spec: &ProductConfigSpecProperties,
     property_spec: &HashMap<PropertyName, PropertySpec>,
 ) -> ValidationResult<()> {
-    for (name, option) in property_spec {
-        let as_of_version = Version::parse(&option.as_of_version)?;
+    for (name, spec) in property_spec {
+        let as_of_version = Version::parse(&spec.as_of_version)?;
 
         // 1) check for default values
-        if let Some(values) = &option.default_values {
+        if let Some(values) = &spec.default_values {
             // 1.1) check if a provided default version matches as_of_version
             util::get_property_value_for_version(name, values, &as_of_version)?;
 
             for val in values {
                 // 1.2) check if default matches the allowed values
-                check_allowed_values(name, &val.value, &option.allowed_values)?;
+                check_allowed_values(name, &val.value, &spec.allowed_values)?;
                 // 1.3) check if default values match datatype (min, max, unit...)
-                check_datatype(&config_spec.units, name, &val.value, &option.datatype)?
+                check_datatype(&config_spec.units, name, &val.value, &spec.datatype)?
             }
         }
 
         // 2) check for recommended values
-        if let Some(values) = &option.recommended_values {
+        if let Some(values) = &spec.recommended_values {
             // 2.1) check if a provided recommended version matches as_of_version
             util::get_property_value_for_version(name, values, &as_of_version)?;
 
             for val in values {
                 // 2.2) check if recommended matches the allowed values
-                check_allowed_values(name, &val.value, &option.allowed_values)?;
+                check_allowed_values(name, &val.value, &spec.allowed_values)?;
                 // 2.3) check if recommended values match datatype (min, max, unit...)
-                check_datatype(&config_spec.units, name, &val.value, &option.datatype)?
+                check_datatype(&config_spec.units, name, &val.value, &spec.datatype)?
             }
         }
 
         // prepare "user" data
         let mut user_data = HashMap::new();
-        if let Some(dependencies) = &option.depends_on {
+        if let Some(dependencies) = &spec.depends_on {
             for dependency in dependencies {
                 for dep_name in &dependency.property_names {
-                    if let Some(dependency_option) = property_spec.get(dep_name) {
-                        if let Some(dependency_option_recommended) =
-                            &dependency_option.recommended_values
+                    if let Some(dependency_property) = property_spec.get(dep_name) {
+                        if let Some(dependency_property_recommended) =
+                            &dependency_property.recommended_values
                         {
                             let filtered_value = util::get_property_value_for_version(
                                 &dep_name,
-                                dependency_option_recommended,
+                                dependency_property_recommended,
                                 &as_of_version,
                             )?;
 
@@ -193,10 +192,10 @@ pub fn validate_config_options(
             }
         }
         // 3) check if dependency values are available and the recommended value matches the required one
-        check_dependencies(name, option, &user_data)?;
+        check_dependencies(name, spec, &user_data)?;
 
         // 4) check if role available
-        if option.roles.is_none() {
+        if spec.roles.is_none() {
             return Err(Error::PropertySpecRoleNotProvided { name: name.clone() });
         }
     }
@@ -208,9 +207,9 @@ pub fn validate_config_options(
 ///
 /// # Arguments
 ///
-/// * `property_name` - name of the config option (config property or environmental variable)
+/// * `property_name` - name of the property
 /// * `property_value` - the final value used
-/// * `property_values` - possible option names e.g. default or recommended values
+/// * `property_values` - possible property names e.g. default or recommended values
 /// * `product_version` - the provided product version
 ///
 fn check_property_value_used(
@@ -229,7 +228,7 @@ fn check_property_value_used(
     Ok(false)
 }
 
-/// Check if config option role is available
+/// Check if property role is available
 ///
 /// # Arguments
 ///
@@ -268,40 +267,40 @@ fn check_role(
     })
 }
 
-/// Check if config option version is supported or deprecated regarding the product version
+/// Check if property version is supported or deprecated regarding the product version
 ///
 /// # Arguments
 ///
-/// * `property_name` - name of the config option
+/// * `property_name` - name of the property
 /// * `product_version` - the current product version
-/// * `option_version` - as of version of the provided config option
-/// * `deprecated_since` - version from which point onwards the option is deprecated
+/// * `property_version` - as of version of the provided config property
+/// * `deprecated_since` - version from which point onwards the property is deprecated
 ///
 fn check_version_supported_or_deprecated(
     property_name: &PropertyName,
-    product_version: &Version,
-    option_version: &str,
+    version: &Version,
+    as_of_version: &str,
     deprecated_since: &Option<String>,
 ) -> ValidationResult<()> {
-    let option_version = Version::parse(option_version)?;
+    let property_version = Version::parse(as_of_version)?;
 
-    // compare version of the config option and product / controller version
-    if option_version > *product_version {
+    // compare version of the property and product version
+    if property_version > *version {
         return Err(Error::VersionNotSupported {
             property_name: property_name.clone(),
-            product_version: product_version.to_string(),
-            required_version: option_version.to_string(),
+            product_version: version.to_string(),
+            required_version: property_version.to_string(),
         });
     }
 
-    // check if requested config option is deprecated
+    // check if requested property is deprecated
     if let Some(deprecated) = deprecated_since {
         let deprecated_since_version = Version::parse(deprecated.as_ref())?;
 
-        if deprecated_since_version <= *product_version {
+        if deprecated_since_version <= *version {
             return Err(Error::VersionDeprecated {
                 property_name: property_name.clone(),
-                product_version: product_version.to_string(),
+                product_version: version.to_string(),
                 deprecated_version: deprecated_since_version.to_string(),
             });
         }
@@ -315,26 +314,26 @@ fn check_version_supported_or_deprecated(
 ///
 /// # Arguments
 ///
-/// * `property_name` - name of the current option
-/// * `config_options` - map with (defined) config option names and the respective config_option
-/// * `user_properties` - map with config option name and potential value provided by user
+/// * `property_name` - name of the property
+/// * `property` - the respective property spec
+/// * `user_properties` - map with property name and potential value provided by user
 ///
 fn check_dependencies(
     property_name: &PropertyName,
     property: &PropertySpec,
     user_properties: &HashMap<String, String>,
 ) -> ValidationResult<()> {
-    // check if config option has dependencies
+    // check if property has dependencies
     let property_dependencies = match &property.depends_on {
         None => return Ok(()),
         Some(dependencies) => dependencies,
     };
 
-    // for each dependency, check if user_options contains the config option and the correct value
+    // for each dependency, check if user_properties contain the property and the correct value
     for property_dependency in property_dependencies {
         // check if we find any matches, otherwise return error after the loop
         let mut found_match = false;
-        // for each option name provided within the dependency
+        // for each property name provided within the dependency
         for dependency_property_name in &property_dependency.property_names {
             if !user_properties.contains_key(&dependency_property_name.name) {
                 continue;
@@ -346,9 +345,9 @@ fn check_dependencies(
                 user_properties.get(&dependency_property_name.name),
                 &property_dependency.value,
             ) {
-                // no user value, no config value -> ok
+                // no user value, no property value -> ok
                 (None, None) => continue,
-                // no user value but config value required -> error
+                // no user value but property value required -> error
                 (None, Some(config_value)) => {
                     return Err(Error::PropertyDependencyUserValueMissing {
                         property_name: property_name.clone(),
@@ -356,7 +355,7 @@ fn check_dependencies(
                         required_value: config_value.clone(),
                     })
                 }
-                // user value but no config value required -> error
+                // user value but no property value required -> error
                 (Some(user_value), None) => {
                     return Err(Error::PropertyDependencyUserValueNotRequired {
                         property_name: property_name.clone(),
@@ -390,13 +389,13 @@ fn check_dependencies(
     Ok(())
 }
 
-/// Check if option value fits the provided datatype
+/// Check if property value fits the provided datatype
 /// # Arguments
 ///
 /// * `config_spec_units` - map with unit name and respective regular expression to evaluate the datatype
 /// * `property_name` - name of the property
-/// * `property_value` - config option value to be validated
-/// * `datatype` - option datatype containing min/max bounds, units etc.
+/// * `property_value` - property value to be validated
+/// * `datatype` - property datatype containing min/max bounds, units etc.
 ///
 fn check_datatype(
     config_spec_units: &HashMap<String, Regex>,
@@ -431,11 +430,11 @@ fn check_datatype(
     Ok(())
 }
 
-/// Check if option value is in allowed values
+/// Check if property value is in allowed values
 /// # Arguments
 ///
-/// * `property_name` - name of the config option (config property or environmental variable)
-/// * `property_value` - config option value to be validated
+/// * `property_name` - name of the property
+/// * `property_value` - property value to be validated
 /// * `allowed_values` - vector of allowed values
 ///
 fn check_allowed_values(
@@ -462,8 +461,8 @@ fn check_allowed_values(
 ///
 /// * `property_name` - name of the property
 /// * `property_value` - the value belonging to the property to be validated
-/// * `min` - minimum value specified in config_option.data_format.min
-/// * `max` - maximum value specified in config_option.data_format.max
+/// * `min` - minimum value specified
+/// * `max` - maximum value specified
 ///
 fn check_datatype_scalar<T>(
     property_name: &PropertyName,
@@ -491,8 +490,8 @@ where
 /// * `config_spec_units` - map with unit name and respective regular expression to evaluate the datatype
 /// * `property_name` - name of the property
 /// * `property_value` - the value belonging to the property to be validated
-/// * `min` - minimum value specified in config_option.data_format.min
-/// * `max` - maximum value specified in config_option.data_format.max
+/// * `min` - minimum value specified
+/// * `max` - maximum value specified
 /// * `unit` - provided unit to get the regular expression to parse the property_value
 ///
 fn check_datatype_string(
@@ -565,7 +564,7 @@ where
 ///
 /// # Arguments
 ///
-/// * `property_name` - name of the config option (config property or environmental variable)
+/// * `property_name` - name of the property
 /// * `value` - value to be validated
 /// * `bound` - upper/lower bound
 /// * `check_out_of_bound` - the method to check against the bound
@@ -597,7 +596,7 @@ where
 ///
 /// # Arguments
 ///
-/// * `property_name` - name of the config option (config property or environmental variable)
+/// * `property_name` - name of the property
 /// * `to_parse` - value to be parsed into a certain T
 ///
 fn parse<T: FromStr>(property_name: &PropertyName, to_parse: &str) -> Result<T, Error> {
@@ -669,7 +668,7 @@ mod tests {
     #[rstest(
         property_name,
         product_version,
-        option_version,
+        property_version,
         deprecated_since,
         expected,
         case(get_conf_property_name(ENV_INTEGER_PORT_MIN_MAX, CONFIG_FILE), V_1_0_0, V_0_5_0, None, Ok(())),
@@ -682,14 +681,14 @@ mod tests {
     fn test_check_version_supported_or_deprecated(
         property_name: PropertyName,
         product_version: &str,
-        option_version: &str,
+        property_version: &str,
         deprecated_since: Option<String>,
         expected: Result<(), Error>,
     ) {
         let result = check_version_supported_or_deprecated(
             &property_name,
             &Version::parse(product_version).unwrap(),
-            option_version,
+            property_version,
             &deprecated_since,
         );
 
@@ -725,7 +724,7 @@ mod tests {
         role: Option<&str>,
         expected: Result<(), Error>,
     ) {
-        let option_config_roles = Some(vec![
+        let property_roles = Some(vec![
             Role {
                 name: ROLE_1.to_string(),
                 required: true,
@@ -736,14 +735,14 @@ mod tests {
             },
         ]);
 
-        let result = check_role(property_name, &option_config_roles, role);
+        let result = check_role(property_name, &property_roles, role);
 
         assert_eq!(result, expected)
     }
 
     #[rstest(
     property_name,
-    user_options,
+    user_properties,
     expected,
     case(
         &get_conf_property_name(ENV_SSL_CERTIFICATE_PATH, CONFIG_FILE),
@@ -783,13 +782,13 @@ mod tests {
     )]
     fn test_check_dependencies(
         property_name: &PropertyName,
-        user_options: HashMap<String, String>,
+        user_properties: HashMap<String, String>,
         expected: Result<(), Error>,
     ) {
         let product_config = get_product_config();
-        let config_option = product_config.property_spec.get(&property_name).unwrap();
+        let property_spec = product_config.property_spec.get(&property_name).unwrap();
 
-        let result = check_dependencies(&property_name, config_option, &user_options);
+        let result = check_dependencies(&property_name, property_spec, &user_properties);
 
         assert_eq!(result, expected)
     }

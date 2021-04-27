@@ -14,38 +14,38 @@ use std::collections::HashMap;
 ///
 /// # Arguments
 ///
-/// * `property_spec` - map with PropertyName as key and the corresponding PropertySpec as value
-/// * `kind` - config kind provided by the user -> relate to config_option.option_name.kind
-/// * `role` - the role required / used for the config options
+/// * `property_spec` - map with property name as key and the corresponding property spec as value
+/// * `kind` - property name kind provided by the user
+/// * `role` - the role required / used for the property
 /// * `product_version` - the provided product version
 ///
-pub fn get_matching_config_options(
+pub(crate) fn get_matching_properties(
     property_spec: &HashMap<PropertyName, PropertySpec>,
     kind: &PropertyNameKind,
     role: Option<&str>,
     product_version: &Version,
 ) -> ValidationResult<HashMap<String, String>> {
-    let mut config_file_options = HashMap::new();
+    let mut properties = HashMap::new();
 
     for (property_name, spec) in property_spec {
-        // ignore this option if kind does not match
-        // TODO: improve performance by sorting config options per kind
+        // ignore this property if kind does not match
+        // TODO: improve performance by sorting properties via kind
         if &property_name.kind != kind {
             continue;
         }
 
-        // Ignore this configuration option if it is only available (specified via `as_of_version`)
+        // Ignore this configuration property if it is only available (specified via `as_of_version`)
         // in later versions than the one we're checking against.
         if Version::parse(spec.as_of_version.as_str())? > *product_version {
             continue;
         }
 
         // ignore completely if role is None
-        // ignore this option if role does not match or is not required
-        if let Some(config_option_roles) = &spec.roles {
-            for config_option_role in config_option_roles {
+        // ignore this property if role does not match or is not required
+        if let Some(property_roles) = &spec.roles {
+            for property_role in property_roles {
                 // role found?
-                if Some(config_option_role.name.as_str()) == role && config_option_role.required {
+                if Some(property_role.name.as_str()) == role && property_role.required {
                     // check for recommended value and matching version
                     if let Some(recommended) = &spec.recommended_values {
                         let property_value = get_property_value_for_version(
@@ -54,20 +54,17 @@ pub fn get_matching_config_options(
                             product_version,
                         )?;
 
-                        config_file_options
-                            .insert(property_name.name.clone(), property_value.value);
+                        properties.insert(property_name.name.clone(), property_value.value);
 
-                        // check for dependencies
-                        if let Some(config_option_dependencies) = &spec.depends_on {
-                            // dependency found
+                        if let Some(property_dependencies) = &spec.depends_on {
                             let dependencies = get_config_dependencies_and_values(
                                 property_spec,
                                 product_version,
                                 property_name,
-                                &config_option_dependencies,
+                                &property_dependencies,
                             )?;
 
-                            config_file_options.extend(dependencies);
+                            properties.extend(dependencies);
                         }
                     }
                 }
@@ -75,19 +72,19 @@ pub fn get_matching_config_options(
         }
     }
 
-    Ok(config_file_options)
+    Ok(properties)
 }
 
 /// Collect all dependencies that are required based on user properties
 ///
 /// # Arguments
 ///
-/// * `property_spec` - map with PropertyName as key and the corresponding PropertySpec as value
+/// * `property_spec` - map with property name as key and the corresponding property spec as value
 /// * `user_config` - map with the user config names and according values
 /// * `version` - the provided product version
-/// * `kind` - config kind provided by the user -> relate to config_option.option_name.kind
+/// * `kind` - property name kind provided by the user
 ///
-pub fn get_matching_dependencies(
+pub(crate) fn get_matching_dependencies(
     property_spec: &HashMap<PropertyName, PropertySpec>,
     user_config: &HashMap<String, String>,
     version: &Version,
@@ -95,17 +92,17 @@ pub fn get_matching_dependencies(
 ) -> ValidationResult<HashMap<String, String>> {
     let mut user_dependencies = HashMap::new();
     for name in user_config.keys() {
-        let option_name = PropertyName {
+        let property_name = PropertyName {
             name: name.clone(),
             kind: kind.clone(),
         };
 
-        if let Some(option) = property_spec.get(&option_name) {
-            if let Some(dependencies) = &option.depends_on {
+        if let Some(property) = property_spec.get(&property_name) {
+            if let Some(dependencies) = &property.depends_on {
                 user_dependencies.extend(get_config_dependencies_and_values(
                     property_spec,
                     version,
-                    &option_name,
+                    &property_name,
                     dependencies,
                 )?);
             }
@@ -132,27 +129,29 @@ fn get_config_dependencies_and_values(
     property_dependencies: &[PropertyDependency],
 ) -> ValidationResult<HashMap<String, String>> {
     let mut dependencies = HashMap::new();
-    for option_dependency in property_dependencies {
-        for dependency_option_name in &option_dependency.property_names {
+    for property_dependency in property_dependencies {
+        for property_dependency_name in &property_dependency.property_names {
             // the dependency should not differ in the kind
-            if property_name.kind == dependency_option_name.kind {
+            if property_name.kind == property_dependency_name.kind {
                 // if the dependency has a proposed value we are done
-                if let Some(dependency_value) = &option_dependency.value {
+                if let Some(dependency_value) = &property_dependency.value {
                     dependencies.insert(
-                        dependency_option_name.name.clone(),
+                        property_dependency_name.name.clone(),
                         dependency_value.clone(),
                     );
                 }
                 // we check the dependency for a recommended value
-                if let Some(dependency_config_option) = property_spec.get(dependency_option_name) {
-                    if let Some(recommended) = &dependency_config_option.recommended_values {
+                if let Some(dependency_property) = property_spec.get(property_dependency_name) {
+                    if let Some(recommended) = &dependency_property.recommended_values {
                         let recommended_value = get_property_value_for_version(
                             property_name,
                             recommended,
                             product_version,
                         )?;
-                        dependencies
-                            .insert(dependency_option_name.name.clone(), recommended_value.value);
+                        dependencies.insert(
+                            property_dependency_name.name.clone(),
+                            recommended_value.value,
+                        );
                     }
                 }
             }
@@ -173,7 +172,7 @@ fn get_config_dependencies_and_values(
 /// * `property_values` - list of property values and their respective versions
 /// * `product_version` - the product version
 ///
-pub fn get_property_value_for_version(
+pub(crate) fn get_property_value_for_version(
     property_name: &PropertyName,
     property_values: &[PropertyValueSpec],
     product_version: &Version,

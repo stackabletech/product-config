@@ -5,13 +5,13 @@ use std::fmt;
 
 /// Represents config spec like unit and regex specification
 #[derive(Debug)]
-pub struct ProductConfigSpecProperties {
+pub(crate) struct ProductConfigSpecProperties {
     pub units: HashMap<String, Regex>,
 }
 
 /// Represents one property spec entry for a given property
 #[derive(Deserialize, Clone, Debug)]
-pub struct PropertySpec {
+pub(crate) struct PropertySpec {
     pub property_names: Vec<PropertyName>,
     pub datatype: Datatype,
     pub default_values: Option<Vec<PropertyValueSpec>>,
@@ -62,14 +62,14 @@ impl PropertyNameKind {
 
 /// Represents the config unit (name corresponds to the unit type like password and a given regex)
 #[derive(Deserialize, Debug)]
-pub struct Unit {
+pub(crate) struct Unit {
     pub name: String,
     pub regex: Option<String>,
     pub examples: Option<Vec<String>>,
     pub comment: Option<String>,
 }
 
-/// Represents the default or recommended values a config option may have: since default values
+/// Represents the default or recommended values a property may have: since default values
 /// may change with different releases, optional from and to version parameters can be provided
 #[derive(Deserialize, Clone, Debug, Eq, PartialOrd, PartialEq)]
 pub struct PropertyValueSpec {
@@ -81,7 +81,7 @@ pub struct PropertyValueSpec {
 /// Represents all supported data types
 #[derive(Deserialize, Clone, Debug, Eq, PartialOrd, PartialEq)]
 #[serde(rename_all = "lowercase", tag = "type")]
-pub enum Datatype {
+pub(crate) enum Datatype {
     Bool,
     Integer {
         min: Option<String>,
