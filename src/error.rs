@@ -1,5 +1,5 @@
-use crate::types::{ConfigOptionDependency, ConfigValue};
-use crate::ConfigName;
+use crate::types::{PropertyDependency, PropertyValueSpec};
+use crate::PropertyName;
 
 #[derive(thiserror::Error, Clone, Debug, PartialOrd, PartialEq)]
 pub enum Error {
@@ -15,69 +15,69 @@ pub enum Error {
         source: semver::SemVerError,
     },
 
-    #[error("[{option_name}]: current product version is '{product_version}' -> option not supported; available from version '{required_version}'")]
+    #[error("[{property_name}]: current product version is '{product_version}' -> option not supported; available from version '{required_version}'")]
     VersionNotSupported {
-        option_name: ConfigName,
+        property_name: PropertyName,
         product_version: String,
         required_version: String,
     },
 
-    #[error("[{option_name}]: current product version is '{product_version}' -> option deprecated since version '{deprecated_version}'")]
+    #[error("[{property_name}]: current product version is '{product_version}' -> option deprecated since version '{deprecated_version}'")]
     VersionDeprecated {
-        option_name: ConfigName,
+        property_name: PropertyName,
         product_version: String,
         deprecated_version: String,
     },
 
-    #[error("Required config setting not found: '{name}'")]
-    ConfigSettingNotFound { name: String },
+    #[error("Required config spec property not found: '{name}'")]
+    ConfigSpecPropertiesNotFound { name: String },
 
-    #[error("No config option found that matches '{option_name}'")]
-    ConfigOptionNotFound { option_name: ConfigName },
+    #[error("No config property found that matches '{property_name}'")]
+    PropertyNotFound { property_name: PropertyName },
 
     #[error("No roles in '{name}' match the provided role: '{role}'")]
-    ConfigOptionRoleNotFound { name: ConfigName, role: String },
+    PropertySpecRoleNotFound { name: PropertyName, role: String },
 
     #[error("No config option roles provided for '{name}' ")]
-    ConfigOptionRoleNotProvided { name: ConfigName },
+    PropertySpecRoleNotProvided { name: PropertyName },
 
     #[error("No role was provided by user for '{name}' ")]
-    ConfigOptionRoleNotProvidedByUser { name: ConfigName },
+    PropertySpecRoleNotProvidedByUser { name: PropertyName },
 
     #[error("[{0}]: provided value '{received}' violates min/max bound '{expected}'")]
-    ConfigValueOutOfBounds {
-        option_name: ConfigName,
+    PropertyValueOutOfBounds {
+        property_name: PropertyName,
         received: String,
         expected: String,
     },
 
-    #[error("[{option_name}]: provided config value missing")]
-    ConfigValueMissing { option_name: ConfigName },
+    #[error("[{property_name}]: provided config value missing")]
+    PropertyValueMissing { property_name: PropertyName },
 
-    #[error("[{option_name}]: provided config value(s) missing for version '{version}'. Got: {option_values:?}")]
-    ConfigValueMissingForVersion {
-        option_name: ConfigName,
-        option_values: Vec<ConfigValue>,
+    #[error("[{property_name}]: provided property value(s) missing for version '{version}'. Got: {property_values:?}")]
+    PropertySpecValueMissingForVersion {
+        property_name: PropertyName,
+        property_values: Vec<PropertyValueSpec>,
         version: String,
     },
 
-    #[error("[{option_name}]: value '{value}' not in allowed values: {allowed_values:?}")]
-    ConfigValueNotInAllowedValues {
-        option_name: ConfigName,
+    #[error("[{property_name}]: value '{value}' not in allowed values: {allowed_values:?}")]
+    PropertyValueNotInAllowedValues {
+        property_name: PropertyName,
         value: String,
         allowed_values: Vec<String>,
     },
 
-    #[error("[{option_name}]: value '{value}' not of specified type: '{datatype}'")]
+    #[error("[{property_name}]: value '{value}' not of specified type: '{datatype}'")]
     DatatypeNotMatching {
-        option_name: ConfigName,
+        property_name: PropertyName,
         value: String,
         datatype: String,
     },
 
-    #[error("[{option_name}]: value '{value}' does not match regex")]
+    #[error("[{property_name}]: value '{value}' does not match regex")]
     DatatypeRegexNotMatching {
-        option_name: ConfigName,
+        property_name: PropertyName,
         value: String,
     },
 
@@ -87,52 +87,52 @@ pub enum Error {
     #[error("Invalid regex pattern for unit '{unit}': '{regex}'")]
     InvalidRegexPattern { unit: String, regex: String },
 
-    #[error("[{option_name}]: unit not provided")]
-    UnitNotProvided { option_name: ConfigName },
+    #[error("[{property_name}]: unit not provided")]
+    UnitNotProvided { property_name: PropertyName },
 
-    #[error("[{option_name}]: unit '{unit}' not found in settings")]
+    #[error("[{property_name}]: unit '{unit}' not found in settings")]
     UnitSettingNotFound {
-        option_name: ConfigName,
+        property_name: PropertyName,
         unit: String,
     },
 
-    #[error("[{option_name}]: required dependency not provided: '{dependency:?}'")]
-    ConfigDependencyMissing {
-        option_name: ConfigName,
-        dependency: Vec<ConfigName>,
+    #[error("[{property_name}]: required dependency not provided: '{dependency:?}'")]
+    PropertyDependencyMissing {
+        property_name: PropertyName,
+        dependency: Vec<PropertyName>,
     },
 
     #[error(
-        "[{option_name}]: dependency '{dependency}' requires no values, but was set to '{user_value}'"
+        "[{property_name}]: dependency '{dependency}' requires no values, but was set to '{user_value}'"
     )]
-    ConfigDependencyUserValueNotRequired {
-        option_name: ConfigName,
+    PropertyDependencyUserValueNotRequired {
+        property_name: PropertyName,
         dependency: String,
         user_value: String,
     },
 
     #[error(
-        "[{option_name}]: dependency '{dependency}' requires value '{required_value}' to be set"
+        "[{property_name}]: dependency '{dependency}' requires value '{required_value}' to be set"
     )]
-    ConfigDependencyUserValueMissing {
-        option_name: ConfigName,
+    PropertyDependencyUserValueMissing {
+        property_name: PropertyName,
         dependency: String,
         required_value: String,
     },
 
     #[error(
-        "[{option_name}]: provided value '{user_value} does not match required value '{required_value}' for dependency '{dependency}'"
+        "[{property_name}]: provided value '{user_value} does not match required value '{required_value}' for dependency '{dependency}'"
     )]
-    ConfigDependencyValueInvalid {
-        option_name: ConfigName,
+    PropertyDependencyValueInvalid {
+        property_name: PropertyName,
         dependency: String,
         user_value: String,
         required_value: String,
     },
 
-    #[error("[{option_name}]: no provided or recommended values in dependency '{dependency:?}'")]
-    ConfigDependencyValueMissing {
-        option_name: ConfigName,
-        dependency: ConfigOptionDependency,
+    #[error("[{property_name}]: no provided or recommended values in dependency '{dependency:?}'")]
+    PropertyDependencyValueMissing {
+        property_name: PropertyName,
+        dependency: PropertyDependency,
     },
 }

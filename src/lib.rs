@@ -11,7 +11,7 @@
 //! - apply mode for config changes (e.g. restart)
 //! - additional information like web links or descriptions
 //!
-//! For now, the product config is build from e.g. a JSON file like "../data/test_config.json":
+//! For now, the product config is build from e.g. a JSON file like "../data/test_property_spec.json":
 //! The JSON example is defined as ConfigItem and is split into config_settings and config_options
 //!  - config_settings contains additional information (e.g. like unit and respective regex patterns)
 //!  - config_options contains all the possible configuration options including all the know how for validation
@@ -28,9 +28,8 @@ use std::string::String;
 
 use crate::error::Error;
 use crate::reader::ConfigReader;
-use crate::types::{ConfigKind, ConfigName, ConfigOption, ConfigSpec};
+use crate::types::{ProductConfigSpecProperties, PropertyName, PropertyNameKind, PropertySpec};
 use crate::validation::ValidationResult;
-use regex::Regex;
 use semver::Version;
 
 /// This will be returned for every validated configuration value (including user values
@@ -53,53 +52,56 @@ pub enum ConfigOptionValidationResult {
 }
 
 #[derive(Debug)]
-pub struct ProductConfig {
+pub struct ProductConfigSpec {
     // provided config units with corresponding regex pattern
-    config_setting_units: HashMap<String, Regex>,
+    config_spec: ProductConfigSpecProperties,
     // option names as key and the corresponding option as value
-    config_options: HashMap<ConfigName, ConfigOption>,
+    property_spec: HashMap<PropertyName, PropertySpec>,
 }
 
-impl ProductConfig {
+impl ProductConfigSpec {
     /// Create a ProductConfig based on a config reader like e.g. JSON, YAML etc.
     ///
     /// # Arguments
     ///
     /// * `config_reader` - config_reader implementation
     ///
-    pub fn new<CR: ConfigReader<ConfigSpec>>(config_reader: CR) -> ValidationResult<Self> {
-        let config = config_reader.read()?;
-        let product_config = parse_config_spec(&config)?;
+    pub fn new<CR: ConfigReader>(config_reader: CR) -> ValidationResult<Self> {
+        let product_config_spec = config_reader.read()?;
 
         validation::validate_config_options(
-            &product_config.config_options,
-            &product_config.config_setting_units,
+            &product_config_spec.config_spec,
+            &product_config_spec.property_spec,
         )?;
 
-        Ok(product_config)
+        Ok(product_config_spec)
     }
 
-    /// Retrieve and check config options depending on the config option kind (e.g. env, conf),
+    /// Retrieve and check config properties depending on the kind (e.g. env, conf),
     /// the required config file (e.g. environment variables or config properties).
     /// Add other provided options that match the config kind, config file and config role.
-    /// Automatically add and correct missing or wrong config options and dependencies.
+    /// Automatically add and correct missing or wrong config properties and dependencies.
     ///
     /// # Arguments
     ///
     /// * `version` - the current product version
-    /// * `kind` - config kind provided by the user -> relate to config_option.option_name.kind
-    /// * `role` - config role provided by the user -> relate to config_option.roles
+    /// * `kind` - kind provided by the user
+    /// * `role` - role provided by the user
     /// * `user_config` - map with option name and values (the explicit user config options)
     ///
     /// # Examples
     ///
     /// ```
     /// use product_config::reader::ConfigJsonReader;
-    /// use product_config::types::ConfigKind;
-    /// use product_config::ProductConfig;
+    /// use product_config::types::PropertyNameKind;
+    /// use product_config::ProductConfigSpec;
     /// use std::collections::HashMap;
     ///
-    /// let config = ProductConfig::new(ConfigJsonReader::new("data/test_config.json")).unwrap();
+    /// let config = ProductConfigSpec::new(ConfigJsonReader::new(
+    ///     "data/test_config_spec.json",
+    ///     "data/test_property_spec.json",
+    ///   )
+    /// ).unwrap();
     ///
     /// let mut user_data = HashMap::new();
     /// user_data.insert("ENV_INTEGER_PORT_MIN_MAX".to_string(), "12345".to_string());
@@ -107,7 +109,7 @@ impl ProductConfig {
     ///
     /// let env_sh = config.get(
     ///     "0.5.0",
-    ///     &ConfigKind::Conf("env.sh".to_string()),
+    ///     &PropertyNameKind::Conf("env.sh".to_string()),
     ///     Some("role_1"),
     ///     &user_data,
     /// );
@@ -116,7 +118,7 @@ impl ProductConfig {
     pub fn get(
         &self,
         version: &str,
-        kind: &ConfigKind,
+        kind: &PropertyNameKind,
         role: Option<&str>,
         user_config: &HashMap<String, String>,
     ) -> ValidationResult<HashMap<String, ConfigOptionValidationResult>> {
@@ -130,7 +132,7 @@ impl ProductConfig {
             self.merge_config_options(user_config, &product_version, kind, role);
 
         for (name, option_value) in &merged_config_options {
-            let option_name = &ConfigName {
+            let option_name = &PropertyName {
                 name: name.clone(),
                 kind: kind.clone(),
             };
@@ -138,8 +140,8 @@ impl ProductConfig {
             result_config.insert(
                 option_name.name.clone(),
                 validation::validate(
-                    &self.config_options,
-                    &self.config_setting_units,
+                    &self.property_spec,
+                    &self.config_spec,
                     &merged_config_options,
                     &product_version,
                     role,
@@ -166,19 +168,19 @@ impl ProductConfig {
         &self,
         user_config: &HashMap<String, String>,
         version: &Version,
-        kind: &ConfigKind,
+        kind: &PropertyNameKind,
         role: Option<&str>,
     ) -> HashMap<String, String> {
         let mut merged_config_options = HashMap::new();
 
         if let Ok(options) =
-            util::get_matching_config_options(&self.config_options, kind, role, version)
+            util::get_matching_config_options(&self.property_spec, kind, role, version)
         {
             merged_config_options.extend(options)
         }
 
         if let Ok(dependencies) =
-            util::get_matching_dependencies(&self.config_options, user_config, version, kind)
+            util::get_matching_dependencies(&self.property_spec, user_config, version, kind)
         {
             merged_config_options.extend(dependencies);
         }
@@ -189,69 +191,12 @@ impl ProductConfig {
     }
 }
 
-/// Parse the provided config spec. Store config options in a hashmap with the option name
-/// as key. Parse any additional settings like units and the respective regex patterns.
-///
-/// # Arguments
-///
-/// * `config_spec` - the config spec provided by the ConfigReader (JSON, ...)
-///
-fn parse_config_spec(config_spec: &ConfigSpec) -> ValidationResult<ProductConfig> {
-    let mut config_options = HashMap::new();
-    // pack config item options via name into hashmap for access
-    for config_option in config_spec.config_options.iter() {
-        // for every provided config option name, write config option reference into map
-        for option_name in config_option.config_names.iter() {
-            config_options.insert(option_name.clone(), config_option.clone());
-        }
-    }
-
-    let mut config_setting_units = HashMap::new();
-    // pack unit name and compiled regex pattern into map
-    for unit in &config_spec.config_settings.units {
-        let config_setting_unit_name = if unit.name.is_empty() {
-            return Err(Error::ConfigSettingNotFound {
-                name: "unit".to_string(),
-            });
-        } else {
-            unit.name.clone()
-        };
-
-        // no regex or empty regex provided
-        let config_setting_unit_regex =
-            if unit.regex.is_none() || unit.regex == Some("".to_string()) {
-                return Err(Error::EmptyRegexPattern {
-                    unit: unit.name.clone(),
-                });
-            } else {
-                unit.regex.clone().unwrap()
-            };
-
-        let regex = match Regex::new(config_setting_unit_regex.as_str()) {
-            Ok(regex) => regex,
-            Err(_) => {
-                return Err(Error::InvalidRegexPattern {
-                    unit: config_setting_unit_name,
-                    regex: config_setting_unit_regex,
-                });
-            }
-        };
-
-        config_setting_units.insert(config_setting_unit_name, regex);
-    }
-
-    Ok(ProductConfig {
-        config_setting_units,
-        config_options,
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use crate::error::Error;
     use crate::reader::ConfigJsonReader;
-    use crate::types::{ConfigKind, ConfigName};
-    use crate::{ConfigOptionValidationResult, ProductConfig};
+    use crate::types::{PropertyName, PropertyNameKind};
+    use crate::{ConfigOptionValidationResult, ProductConfigSpec};
     use rstest::*;
     use std::collections::HashMap;
 
@@ -338,14 +283,14 @@ mod tests {
         expected,
         case(
             VERSION_0_5_0,
-            &ConfigKind::Conf(CONF_FILE.to_string()),
+            &PropertyNameKind::Conf(CONF_FILE.to_string()),
             Some(ROLE_1),
             create_empty_data_and_expected().0,
             create_empty_data_and_expected().1,
         ),
         case(
             VERSION_0_5_0,
-            &ConfigKind::Conf(CONF_FILE.to_string()),
+            &PropertyNameKind::Conf(CONF_FILE.to_string()),
             Some(ROLE_1),
             create_correct_data_and_expected().0,
             create_correct_data_and_expected().1,
@@ -354,12 +299,16 @@ mod tests {
     )]
     fn test_get_kind_conf_role_1(
         version: &str,
-        kind: &ConfigKind,
+        kind: &PropertyNameKind,
         role: Option<&str>,
         user_data: HashMap<String, String>,
         expected: HashMap<String, ConfigOptionValidationResult>,
     ) {
-        let config = ProductConfig::new(ConfigJsonReader::new("data/test_config.json")).unwrap();
+        let config = ProductConfigSpec::new(ConfigJsonReader::new(
+            "data/test_config_spec.json",
+            "data/test_property_spec.json",
+        ))
+        .unwrap();
 
         let result = config.get(version, kind, role, &user_data).unwrap();
 
@@ -379,14 +328,14 @@ mod tests {
             ConfigOptionValidationResult::RecommendedDefault("recommended".to_string());
         let warn = ConfigOptionValidationResult::Warn(
             "warning".to_string(),
-            Error::ConfigOptionNotFound {
-                option_name: ConfigName {
+            Error::PropertyNotFound {
+                property_name: PropertyName {
                     name: "test".to_string(),
-                    kind: ConfigKind::Conf("my_config".to_string()),
+                    kind: PropertyNameKind::Conf("my_config".to_string()),
                 },
             },
         );
-        let error = ConfigOptionValidationResult::Error(Error::ConfigSettingNotFound {
+        let error = ConfigOptionValidationResult::Error(Error::ConfigSpecPropertiesNotFound {
             name: "xyz".to_string(),
         });
 

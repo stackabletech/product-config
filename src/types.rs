@@ -1,32 +1,27 @@
+use regex::Regex;
 use serde::Deserialize;
+use std::collections::HashMap;
 use std::fmt;
 
-/// Represents the root element structure of JSON/YAML documents
-#[derive(Deserialize, Debug)]
-pub struct ConfigSpec {
-    pub config_settings: ConfigSetting,
-    pub config_options: Vec<ConfigOption>,
+/// Represents config spec like unit and regex specification
+#[derive(Debug)]
+pub struct ProductConfigSpecProperties {
+    pub units: HashMap<String, Regex>,
 }
 
-/// Represents config settings like unit and regex specification
-#[derive(Deserialize, Debug)]
-pub struct ConfigSetting {
-    pub units: Vec<Unit>,
-}
-
-/// Represents one config option entry for a given property
+/// Represents one property spec entry for a given property
 #[derive(Deserialize, Clone, Debug)]
-pub struct ConfigOption {
-    pub config_names: Vec<ConfigName>,
+pub struct PropertySpec {
+    pub property_names: Vec<PropertyName>,
     pub datatype: Datatype,
-    pub default_values: Option<Vec<ConfigValue>>,
-    pub recommended_values: Option<Vec<ConfigValue>>,
+    pub default_values: Option<Vec<PropertyValueSpec>>,
+    pub recommended_values: Option<Vec<PropertyValueSpec>>,
     pub allowed_values: Option<Vec<String>>,
     pub as_of_version: String,
     pub deprecated_since: Option<String>,
     pub deprecated_for: Option<Vec<String>>,
-    pub depends_on: Option<Vec<ConfigOptionDependency>>,
-    pub roles: Option<Vec<ConfigRole>>,
+    pub depends_on: Option<Vec<PropertyDependency>>,
+    pub roles: Option<Vec<Role>>,
     pub restart_required: Option<bool>,
     pub tags: Option<Vec<String>>,
     pub additional_doc: Option<Vec<String>>,
@@ -34,14 +29,14 @@ pub struct ConfigOption {
     pub description: Option<String>,
 }
 
-/// Represents (one of multiple) unique identifier for a config option depending on the type
+/// Represents (one of multiple) unique identifier for a property name depending on the type
 #[derive(Deserialize, Clone, Debug, Hash, Eq, PartialOrd, PartialEq)]
-pub struct ConfigName {
+pub struct PropertyName {
     pub name: String,
-    pub kind: ConfigKind,
+    pub kind: PropertyNameKind,
 }
 
-impl fmt::Display for ConfigName {
+impl fmt::Display for PropertyName {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.name)
     }
@@ -50,16 +45,16 @@ impl fmt::Display for ConfigName {
 /// Represents different config identifier types like config file, environment variable, command line parameter etc.
 #[derive(Deserialize, Clone, Debug, Hash, Eq, PartialOrd, PartialEq)]
 #[serde(tag = "type", content = "file", rename_all = "lowercase")]
-pub enum ConfigKind {
+pub enum PropertyNameKind {
     Conf(String),
     Env,
     Cli,
 }
 
-impl ConfigKind {
+impl PropertyNameKind {
     pub fn get_file_name(&self) -> String {
         match self {
-            ConfigKind::Conf(conf) => conf.clone(),
+            PropertyNameKind::Conf(conf) => conf.clone(),
             _ => "".to_string(),
         }
     }
@@ -77,7 +72,7 @@ pub struct Unit {
 /// Represents the default or recommended values a config option may have: since default values
 /// may change with different releases, optional from and to version parameters can be provided
 #[derive(Deserialize, Clone, Debug, Eq, PartialOrd, PartialEq)]
-pub struct ConfigValue {
+pub struct PropertyValueSpec {
     pub from_version: Option<String>,
     pub to_version: Option<String>,
     pub value: String,
@@ -116,18 +111,17 @@ pub enum Datatype {
     },
 }
 
-/// Represents a dependency on another config option and (if available) a required value
+/// Represents a dependency on another config property and (if available) a required value
 /// e.g. to set ssl certificates one has to set some property use_ssl to true
 #[derive(Deserialize, Clone, Debug, Eq, PartialOrd, PartialEq)]
-pub struct ConfigOptionDependency {
-    pub config_names: Vec<ConfigName>,
+pub struct PropertyDependency {
+    pub property_names: Vec<PropertyName>,
     pub value: Option<String>,
 }
 
-/// Represents a role in the cluster, e.g. Server / Client and if the
-/// config option is required
+/// Represents a role in the cluster, e.g. Server / Client and if the property is required
 #[derive(Deserialize, Clone, Debug, Eq, PartialOrd, PartialEq)]
-pub struct ConfigRole {
+pub struct Role {
     pub name: String,
     pub required: bool,
 }
