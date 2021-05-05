@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::fmt;
 
 /// Represents config spec like unit and regex specification
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct ProductConfigSpecProperties {
     pub units: HashMap<String, Regex>,
 }

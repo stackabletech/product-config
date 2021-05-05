@@ -46,12 +46,16 @@ pub enum PropertyValidationResult {
     Error(Error),
 }
 
-#[derive(Debug)]
+/// This is the main struct to hold all our knowledge about a certain product's configuration.
+///
+/// A product configuration consists of a list of properties and their specification
+/// as well as some "configuration configuration". The latter describes some details about the configuration spec itself.
+#[derive(Clone, Debug)]
 pub struct ProductConfigSpec {
     // provided config units with corresponding regex pattern
     config_spec: ProductConfigSpecProperties,
     // property names as key and the corresponding property spec as value
-    property_spec: HashMap<PropertyName, PropertySpec>,
+    property_specs: HashMap<PropertyName, PropertySpec>,
 }
 
 impl ProductConfigSpec {
@@ -66,7 +70,7 @@ impl ProductConfigSpec {
 
         validation::validate_property_spec(
             &product_config_spec.config_spec,
-            &product_config_spec.property_spec,
+            &product_config_spec.property_specs,
         )?;
 
         Ok(product_config_spec)
@@ -134,7 +138,7 @@ impl ProductConfigSpec {
             result_config.insert(
                 property_name.name.clone(),
                 validation::validate(
-                    &self.property_spec,
+                    &self.property_specs,
                     &self.config_spec,
                     &merged_properties,
                     &product_version,
@@ -168,13 +172,13 @@ impl ProductConfigSpec {
         let mut merged_properties = HashMap::new();
 
         if let Ok(properties) =
-            util::get_matching_properties(&self.property_spec, kind, role, version)
+            util::get_matching_properties(&self.property_specs, kind, role, version)
         {
             merged_properties.extend(properties)
         }
 
         if let Ok(dependencies) =
-            util::get_matching_dependencies(&self.property_spec, user_config, version, kind)
+            util::get_matching_dependencies(&self.property_specs, user_config, version, kind)
         {
             merged_properties.extend(dependencies);
         }
