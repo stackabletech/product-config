@@ -786,7 +786,7 @@ mod tests {
         expected: Result<(), Error>,
     ) {
         let product_config = get_product_config();
-        let property_spec = product_config.property_spec.get(&property_name).unwrap();
+        let property_spec = product_config.property_specs.get(&property_name).unwrap();
 
         let result = check_dependencies(&property_name, property_spec, &user_properties);
 

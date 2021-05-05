@@ -124,6 +124,6 @@ fn parse_json_config_spec(
         config_spec: ProductConfigSpecProperties {
             units: config_spec_units,
         },
-        property_spec: parsed_property_spec,
+        property_specs: parsed_property_spec,
     })
 }
