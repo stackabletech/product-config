@@ -274,34 +274,28 @@ mod tests {
         (data, expected)
     }
 
-    #[rstest(
-        version,
-        kind,
-        role,
-        user_data,
-        expected,
-        case(
-            VERSION_0_5_0,
-            &PropertyNameKind::Conf(CONF_FILE.to_string()),
-            Some(ROLE_1),
-            create_empty_data_and_expected().0,
-            create_empty_data_and_expected().1,
-        ),
-        case(
-            VERSION_0_5_0,
-            &PropertyNameKind::Conf(CONF_FILE.to_string()),
-            Some(ROLE_1),
-            create_correct_data_and_expected().0,
-            create_correct_data_and_expected().1,
-        ),
-    ::trace
+    #[rstest]
+    #[case(
+        VERSION_0_5_0,
+        &PropertyNameKind::Conf(CONF_FILE.to_string()),
+        Some(ROLE_1),
+        create_empty_data_and_expected().0,
+        create_empty_data_and_expected().1,
     )]
+    #[case(
+      VERSION_0_5_0,
+      &PropertyNameKind::Conf(CONF_FILE.to_string()),
+      Some(ROLE_1),
+      create_correct_data_and_expected().0,
+      create_correct_data_and_expected().1,
+    )]
+    #[trace]
     fn test_get_kind_conf_role_1(
-        version: &str,
-        kind: &PropertyNameKind,
-        role: Option<&str>,
-        user_data: HashMap<String, String>,
-        expected: HashMap<String, PropertyValidationResult>,
+        #[case] version: &str,
+        #[case] kind: &PropertyNameKind,
+        #[case] role: Option<&str>,
+        #[case] user_data: HashMap<String, String>,
+        #[case] expected: HashMap<String, PropertyValidationResult>,
     ) {
         let config = ProductConfigSpec::new(ConfigJsonReader::new(
             "data/test_config_spec.json",
