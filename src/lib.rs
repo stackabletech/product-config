@@ -13,6 +13,7 @@
 //!
 pub mod error;
 pub mod reader;
+pub mod ser;
 pub mod types;
 mod util;
 mod validation;
