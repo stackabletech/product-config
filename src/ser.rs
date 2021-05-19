@@ -426,7 +426,7 @@ impl<'a> ser::SerializeSeq for &'a mut Serializer {
             // If our sequence already contains Some we need to append a comma (TODO: Make configurable)
             // At this point we're certain that the current value serializes to something
             if let Some(current_sequence) = self.sequence.as_mut() {
-                current_sequence.push_str(",");
+                current_sequence.push(',');
             }
 
             self.sequence
@@ -456,7 +456,7 @@ impl<'a> ser::SerializeTuple for &'a mut Serializer {
             // If our sequence already contains Some we need to append a comma (TODO: Make configurable)
             // At this point we're certain that the current value serializes to something
             if let Some(current_sequence) = self.sequence.as_mut() {
-                current_sequence.push_str(",");
+                current_sequence.push(',');
             }
 
             self.sequence
@@ -486,7 +486,7 @@ impl<'a> ser::SerializeTupleStruct for &'a mut Serializer {
             // If our sequence already contains Some we need to append a comma (TODO: Make configurable)
             // At this point we're certain that the current value serializes to something
             if let Some(current_sequence) = self.sequence.as_mut() {
-                current_sequence.push_str(",");
+                current_sequence.push(',');
             }
 
             self.sequence
@@ -516,7 +516,7 @@ impl<'a> ser::SerializeTupleVariant for &'a mut Serializer {
             // If our sequence already contains Some we need to append a comma (TODO: Make configurable)
             // At this point we're certain that the current value serializes to something
             if let Some(current_sequence) = self.sequence.as_mut() {
-                current_sequence.push_str(",");
+                current_sequence.push(',');
             }
 
             self.sequence
