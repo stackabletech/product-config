@@ -665,25 +665,19 @@ mod tests {
         .unwrap()
     }
 
-    #[rstest(
-        property_name,
-        product_version,
-        property_version,
-        deprecated_since,
-        expected,
-        case(get_conf_property_name(ENV_INTEGER_PORT_MIN_MAX, CONFIG_FILE), V_1_0_0, V_0_5_0, None, Ok(())),
-        case(get_conf_property_name(ENV_INTEGER_PORT_MIN_MAX, CONFIG_FILE), V_0_1_0, V_1_0_0, Some(V_0_5_0.to_string()),
-            Err(Error::VersionNotSupported { property_name: property_name.clone(), product_version: V_0_1_0.to_string(), required_version: V_1_0_0.to_string() })),
-        case(get_conf_property_name(ENV_INTEGER_PORT_MIN_MAX, CONFIG_FILE), V_1_5_0, V_0_5_0, Some(V_1_0_0.to_string()),
-            Err(Error::VersionDeprecated { property_name: property_name.clone(), product_version: V_1_5_0.to_string(), deprecated_version: V_1_0_0.to_string() })),
-        ::trace
-    )]
+    #[rstest]
+    #[case(get_conf_property_name(ENV_INTEGER_PORT_MIN_MAX, CONFIG_FILE), V_1_0_0, V_0_5_0, None, Ok(()))]
+    #[case(get_conf_property_name(ENV_INTEGER_PORT_MIN_MAX, CONFIG_FILE), V_0_1_0, V_1_0_0, Some(V_0_5_0.to_string()),
+            Err(Error::VersionNotSupported { property_name: property_name.clone(), product_version: V_0_1_0.to_string(), required_version: V_1_0_0.to_string() }))]
+    #[case(get_conf_property_name(ENV_INTEGER_PORT_MIN_MAX, CONFIG_FILE), V_1_5_0, V_0_5_0, Some(V_1_0_0.to_string()),
+            Err(Error::VersionDeprecated { property_name: property_name.clone(), product_version: V_1_5_0.to_string(), deprecated_version: V_1_0_0.to_string() }))]
+    #[trace]
     fn test_check_version_supported_or_deprecated(
-        property_name: PropertyName,
-        product_version: &str,
-        property_version: &str,
-        deprecated_since: Option<String>,
-        expected: Result<(), Error>,
+        #[case] property_name: PropertyName,
+        #[case] product_version: &str,
+        #[case] property_version: &str,
+        #[case] deprecated_since: Option<String>,
+        #[case] expected: Result<(), Error>,
     ) {
         let result = check_version_supported_or_deprecated(
             &property_name,
@@ -698,31 +692,27 @@ mod tests {
     const ROLE_1: &str = "role_1";
     const ROLE_2: &str = "role_2";
 
-    #[rstest(
-        property_name,
-        role,
-        expected,
-        case(
-            &get_conf_property_name(ENV_INTEGER_PORT_MIN_MAX, CONFIG_FILE),
-            Some(ROLE_1),
-            Ok(())
-        ),
-        case(
-            &get_conf_property_name(ENV_INTEGER_PORT_MIN_MAX, CONFIG_FILE),
-            Some(ROLE_2),
-            Ok(())
-        ),
-        case(
-            &get_conf_property_name(ENV_INTEGER_PORT_MIN_MAX, CONFIG_FILE),
-            None,
-            Err(Error::PropertySpecRoleNotProvidedByUser { name: get_conf_property_name(ENV_INTEGER_PORT_MIN_MAX, CONFIG_FILE) })
-        ),
-        ::trace
+    #[rstest]
+    #[case(
+        &get_conf_property_name(ENV_INTEGER_PORT_MIN_MAX, CONFIG_FILE),
+        Some(ROLE_1),
+        Ok(())
     )]
+    #[case(
+        &get_conf_property_name(ENV_INTEGER_PORT_MIN_MAX, CONFIG_FILE),
+        Some(ROLE_2),
+        Ok(())
+    )]
+    #[case(
+        &get_conf_property_name(ENV_INTEGER_PORT_MIN_MAX, CONFIG_FILE),
+        None,
+        Err(Error::PropertySpecRoleNotProvidedByUser { name: get_conf_property_name(ENV_INTEGER_PORT_MIN_MAX, CONFIG_FILE) })
+    )]
+    #[trace]
     fn test_check_role(
-        property_name: &PropertyName,
-        role: Option<&str>,
-        expected: Result<(), Error>,
+        #[case] property_name: &PropertyName,
+        #[case] role: Option<&str>,
+        #[case] expected: Result<(), Error>,
     ) {
         let property_roles = Some(vec![
             Role {
@@ -740,11 +730,8 @@ mod tests {
         assert_eq!(result, expected)
     }
 
-    #[rstest(
-    property_name,
-    user_properties,
-    expected,
-    case(
+    #[rstest]
+    #[case(
         &get_conf_property_name(ENV_SSL_CERTIFICATE_PATH, CONFIG_FILE),
         hashmap!{
             ENV_SSL_CERTIFICATE_PATH.to_string() => "some/path/to/certificate".to_string()
@@ -756,8 +743,8 @@ mod tests {
                 PropertyName { name: CONF_SSL_ENABLED.to_string(), kind: PropertyNameKind::Conf(CONFIG_FILE_2.to_string()) }
             ]
         })
-    ),
-    case(
+    )]
+    #[case(
         &get_conf_property_name(ENV_SSL_CERTIFICATE_PATH, CONFIG_FILE),
         hashmap!{
             ENV_SSL_CERTIFICATE_PATH.to_string() => "some/path/to/certificate".to_string(),
@@ -769,21 +756,20 @@ mod tests {
             user_value: "false".to_string(),
             required_value: "true".to_string()
         })
-    ),
-    case(
+    )]
+    #[case(
         &get_conf_property_name(ENV_SSL_CERTIFICATE_PATH, CONFIG_FILE),
         hashmap!{
             ENV_SSL_CERTIFICATE_PATH.to_string() => "some/path/to/certificate".to_string(),
             ENV_SSL_ENABLED.to_string() => "true".to_string()
         },
         Ok(())
-    ),
-    ::trace
     )]
+    #[trace]
     fn test_check_dependencies(
-        property_name: &PropertyName,
-        user_properties: HashMap<String, String>,
-        expected: Result<(), Error>,
+        #[case] property_name: &PropertyName,
+        #[case] user_properties: HashMap<String, String>,
+        #[case] expected: Result<(), Error>,
     ) {
         let product_config = get_product_config();
         let property_spec = product_config.property_specs.get(&property_name).unwrap();
@@ -806,66 +792,61 @@ mod tests {
     const FLOAT_CORRECT: &str = "87.2123";
     const FLOAT_BAD: &str = "100,0";
 
-    #[rstest(
-        property_name,
-        property_value,
-        datatype,
-        expected,
-        case(
-            &get_conf_property_name(ENV_INTEGER_PORT_MIN_MAX, CONFIG_FILE),
-            PORT_CORRECT,
-            &Datatype::Integer{ min: Some(MIN_PORT.to_string()), max: Some(MAX_PORT.to_string()), unit: Some("port".to_string()), accepted_units: None, default_unit:None },
-            Ok(())
-        ),
-        case(
-            &get_conf_property_name(ENV_INTEGER_PORT_MIN_MAX, CONFIG_FILE),
-            PORT_BAD_DATATYPE,
-            &Datatype::Integer{ min: Some(MIN_PORT.to_string()), max: Some(MAX_PORT.to_string()), unit: Some("port".to_string()), accepted_units: None, default_unit:None },
-            Err(Error::DatatypeNotMatching { property_name: get_conf_property_name(ENV_INTEGER_PORT_MIN_MAX, CONFIG_FILE), value: PORT_BAD_DATATYPE.to_string(), datatype: "i64".to_string() })
-        ),
-        case(
-            &get_conf_property_name(ENV_INTEGER_PORT_MIN_MAX, CONFIG_FILE),
-            PORT_OUT_OF_BOUNDS,
-            &Datatype::Integer{ min: Some(MIN_PORT.to_string()), max: Some(MAX_PORT.to_string()), unit: Some("port".to_string()), accepted_units: None, default_unit:None },
-            Err(Error::PropertyValueOutOfBounds { property_name: get_conf_property_name(ENV_INTEGER_PORT_MIN_MAX, CONFIG_FILE), received: PORT_OUT_OF_BOUNDS.to_string(), expected: MAX_PORT.to_string() })
-        ),
-        case(
-            &get_conf_property_name(ENV_PROPERTY_STRING_MEMORY, CONFIG_FILE),
-            MEMORY_CORRECT_MB,
-            &Datatype::String{ min: None, max: None, unit: Some("memory".to_string()), accepted_units: None, default_unit:None },
-            Ok(())
-        ),
-        case(
-            &get_conf_property_name(ENV_PROPERTY_STRING_MEMORY, CONFIG_FILE),
-            MEMORY_CORRECT_GB,
-            &Datatype::String{ min: None, max: None, unit: Some("memory".to_string()), accepted_units: None, default_unit:None },
-            Ok(())
-        ),
-        case(
-            &get_conf_property_name(ENV_PROPERTY_STRING_MEMORY, CONFIG_FILE),
-            MEMORY_MISSING_UNIT,
-            &Datatype::String{ min: None, max: None, unit: Some("memory".to_string()), accepted_units: None, default_unit:None },
-            Err(Error::DatatypeRegexNotMatching { property_name: get_conf_property_name(ENV_PROPERTY_STRING_MEMORY, CONFIG_FILE), value: MEMORY_MISSING_UNIT.to_string() })
-        ),
-        case(
-            &get_conf_property_name(ENV_VAR_FLOAT, CONFIG_FILE),
-            FLOAT_CORRECT,
-            &Datatype::Float{ min: Some("0.0".to_string()), max: Some("100.0".to_string()), unit: None, accepted_units: None, default_unit:None },
-            Ok(())
-        ),
-        case(
-            &get_conf_property_name(ENV_VAR_FLOAT, CONFIG_FILE),
-            FLOAT_BAD,
-            &Datatype::Float{ min: Some("0.0".to_string()), max: Some("100.0".to_string()), unit: None, accepted_units: None, default_unit:None },
-            Err(Error::DatatypeNotMatching { property_name: get_conf_property_name(ENV_VAR_FLOAT, CONFIG_FILE), value: FLOAT_BAD.to_string(), datatype: "f64".to_string() })
-        ),
-    ::trace
+    #[rstest]
+    #[case(
+        &get_conf_property_name(ENV_INTEGER_PORT_MIN_MAX, CONFIG_FILE),
+        PORT_CORRECT,
+        &Datatype::Integer{ min: Some(MIN_PORT.to_string()), max: Some(MAX_PORT.to_string()), unit: Some("port".to_string()), accepted_units: None, default_unit:None },
+        Ok(())
     )]
+    #[case(
+        &get_conf_property_name(ENV_INTEGER_PORT_MIN_MAX, CONFIG_FILE),
+        PORT_BAD_DATATYPE,
+        &Datatype::Integer{ min: Some(MIN_PORT.to_string()), max: Some(MAX_PORT.to_string()), unit: Some("port".to_string()), accepted_units: None, default_unit:None },
+        Err(Error::DatatypeNotMatching { property_name: get_conf_property_name(ENV_INTEGER_PORT_MIN_MAX, CONFIG_FILE), value: PORT_BAD_DATATYPE.to_string(), datatype: "i64".to_string() })
+    )]
+    #[case(
+        &get_conf_property_name(ENV_INTEGER_PORT_MIN_MAX, CONFIG_FILE),
+        PORT_OUT_OF_BOUNDS,
+        &Datatype::Integer{ min: Some(MIN_PORT.to_string()), max: Some(MAX_PORT.to_string()), unit: Some("port".to_string()), accepted_units: None, default_unit:None },
+        Err(Error::PropertyValueOutOfBounds { property_name: get_conf_property_name(ENV_INTEGER_PORT_MIN_MAX, CONFIG_FILE), received: PORT_OUT_OF_BOUNDS.to_string(), expected: MAX_PORT.to_string() })
+    )]
+    #[case(
+        &get_conf_property_name(ENV_PROPERTY_STRING_MEMORY, CONFIG_FILE),
+        MEMORY_CORRECT_MB,
+        &Datatype::String{ min: None, max: None, unit: Some("memory".to_string()), accepted_units: None, default_unit:None },
+        Ok(())
+    )]
+    #[case(
+        &get_conf_property_name(ENV_PROPERTY_STRING_MEMORY, CONFIG_FILE),
+        MEMORY_CORRECT_GB,
+        &Datatype::String{ min: None, max: None, unit: Some("memory".to_string()), accepted_units: None, default_unit:None },
+        Ok(())
+    )]
+    #[case(
+        &get_conf_property_name(ENV_PROPERTY_STRING_MEMORY, CONFIG_FILE),
+        MEMORY_MISSING_UNIT,
+        &Datatype::String{ min: None, max: None, unit: Some("memory".to_string()), accepted_units: None, default_unit:None },
+        Err(Error::DatatypeRegexNotMatching { property_name: get_conf_property_name(ENV_PROPERTY_STRING_MEMORY, CONFIG_FILE), value: MEMORY_MISSING_UNIT.to_string() })
+    )]
+    #[case(
+        &get_conf_property_name(ENV_VAR_FLOAT, CONFIG_FILE),
+        FLOAT_CORRECT,
+        &Datatype::Float{ min: Some("0.0".to_string()), max: Some("100.0".to_string()), unit: None, accepted_units: None, default_unit:None },
+        Ok(())
+    )]
+    #[case(
+        &get_conf_property_name(ENV_VAR_FLOAT, CONFIG_FILE),
+        FLOAT_BAD,
+        &Datatype::Float{ min: Some("0.0".to_string()), max: Some("100.0".to_string()), unit: None, accepted_units: None, default_unit:None },
+        Err(Error::DatatypeNotMatching { property_name: get_conf_property_name(ENV_VAR_FLOAT, CONFIG_FILE), value: FLOAT_BAD.to_string(), datatype: "f64".to_string() })
+    )]
+    #[trace]
     fn test_check_datatype(
-        property_name: &PropertyName,
-        property_value: &str,
-        datatype: &Datatype,
-        expected: Result<(), Error>,
+        #[case] property_name: &PropertyName,
+        #[case] property_value: &str,
+        #[case] datatype: &Datatype,
+        #[case] expected: Result<(), Error>,
     ) {
         let config_spec_units = get_product_config().config_spec.units;
 
@@ -879,34 +860,29 @@ mod tests {
     const ALLOWED_VALUE_3: &str = "allowed_value_3";
     const NOT_ALLOWED_VALUE: &str = "not_allowed_value";
 
-    #[rstest(
-        property_name,
-        property_value,
-        allowed_values,
-        expected,
-        case(
-            &get_conf_property_name(ENV_ALLOWED_VALUES, CONFIG_FILE),
-            ALLOWED_VALUE_1,
-            Some(vec![ALLOWED_VALUE_1.to_string(), ALLOWED_VALUE_2.to_string(), ALLOWED_VALUE_3.to_string()]),
-            Ok(())
-        ),
-        case(
-            &get_conf_property_name(ENV_ALLOWED_VALUES, CONFIG_FILE),
-            NOT_ALLOWED_VALUE,
-            Some(vec![ALLOWED_VALUE_1.to_string(), ALLOWED_VALUE_2.to_string(), ALLOWED_VALUE_3.to_string()]),
-            Err(Error::PropertyValueNotInAllowedValues {
-                property_name: get_conf_property_name(ENV_ALLOWED_VALUES, CONFIG_FILE),
-                value: NOT_ALLOWED_VALUE.to_string(),
-                allowed_values: vec![ALLOWED_VALUE_1.to_string(), ALLOWED_VALUE_2.to_string(), ALLOWED_VALUE_3.to_string() ]
-            })
-        ),
-    ::trace
+    #[rstest]
+    #[case(
+        &get_conf_property_name(ENV_ALLOWED_VALUES, CONFIG_FILE),
+        ALLOWED_VALUE_1,
+        Some(vec![ALLOWED_VALUE_1.to_string(), ALLOWED_VALUE_2.to_string(), ALLOWED_VALUE_3.to_string()]),
+        Ok(())
     )]
+    #[case(
+        &get_conf_property_name(ENV_ALLOWED_VALUES, CONFIG_FILE),
+        NOT_ALLOWED_VALUE,
+        Some(vec![ALLOWED_VALUE_1.to_string(), ALLOWED_VALUE_2.to_string(), ALLOWED_VALUE_3.to_string()]),
+        Err(Error::PropertyValueNotInAllowedValues {
+            property_name: get_conf_property_name(ENV_ALLOWED_VALUES, CONFIG_FILE),
+            value: NOT_ALLOWED_VALUE.to_string(),
+            allowed_values: vec![ALLOWED_VALUE_1.to_string(), ALLOWED_VALUE_2.to_string(), ALLOWED_VALUE_3.to_string() ]
+        })
+    )]
+    #[trace]
     fn test_check_allowed_values(
-        property_name: &PropertyName,
-        property_value: &str,
-        allowed_values: Option<Vec<String>>,
-        expected: Result<(), Error>,
+        #[case] property_name: &PropertyName,
+        #[case] property_value: &str,
+        #[case] allowed_values: Option<Vec<String>>,
+        #[case] expected: Result<(), Error>,
     ) {
         let result = check_allowed_values(property_name, property_value, &allowed_values);
 
