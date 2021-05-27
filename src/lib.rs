@@ -337,6 +337,5 @@ mod tests {
 
         assert!(warn < error);
         assert!(error > warn);
-        assert_eq!(error, error);
     }
 }
