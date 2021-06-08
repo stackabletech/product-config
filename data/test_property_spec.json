@@ -4,14 +4,14 @@
       {
         "name": "ENV_INTEGER_PORT_MIN_MAX",
         "kind": {
-          "type": "conf",
+          "type": "file",
           "file": "env.sh"
         }
       },
       {
         "name": "conf.integer.port.min.max",
         "kind": {
-          "type": "conf",
+          "type": "file",
           "file": "my.config"
         }
       }
@@ -56,14 +56,14 @@
       {
         "name": "ENV_FLOAT",
         "kind": {
-          "type": "conf",
+          "type": "file",
           "file": "env.sh"
         }
       },
       {
         "name": "conf.float",
         "kind": {
-          "type": "conf",
+          "type": "file",
           "file": "my.config"
         }
       }
@@ -107,14 +107,14 @@
       {
         "name": "ENV_PROPERTY_STRING_MEMORY",
         "kind": {
-          "type": "conf",
+          "type": "file",
           "file": "env.sh"
         }
       },
       {
         "name": "conf.property.string.memory",
         "kind": {
-          "type": "conf",
+          "type": "file",
           "file": "my.config"
         }
       }
@@ -158,14 +158,14 @@
       {
         "name": "ENV_PROPERTY_STRING_DEPRECATED",
         "kind": {
-          "type": "conf",
+          "type": "file",
           "file": "env.sh"
         }
       },
       {
         "name": "conf.property.string.deprecated",
         "kind": {
-          "type": "conf",
+          "type": "file",
           "file": "my.config"
         }
       }
@@ -193,14 +193,14 @@
       {
         "name": "ENV_ALLOWED_VALUES",
         "kind": {
-          "type": "conf",
+          "type": "file",
           "file": "env.sh"
         }
       },
       {
         "name": "conf.allowed.values",
         "kind": {
-          "type": "conf",
+          "type": "file",
           "file": "my.config"
         }
       }
@@ -238,14 +238,14 @@
       {
         "name": "ENV_SECURITY",
         "kind": {
-          "type": "conf",
+          "type": "file",
           "file": "env.sh"
         }
       },
       {
         "name": "conf.security",
         "kind": {
-          "type": "conf",
+          "type": "file",
           "file": "my.config"
         }
       }
@@ -283,14 +283,14 @@
       {
         "name": "ENV_SECURITY_PASSWORD",
         "kind": {
-          "type": "conf",
+          "type": "file",
           "file": "env.sh"
         }
       },
       {
         "name": "conf.security.password",
         "kind": {
-          "type": "conf",
+          "type": "file",
           "file": "my.config"
         }
       }
@@ -316,14 +316,14 @@
           {
             "name": "ENV_SECURITY",
             "kind": {
-              "type": "conf",
+              "type": "file",
               "file": "env.sh"
             }
           },
           {
             "name": "conf.security",
             "kind": {
-              "type": "conf",
+              "type": "file",
               "file": "my.config"
             }
           }
@@ -338,14 +338,14 @@
       {
         "name": "ENV_SSL_ENABLED",
         "kind": {
-          "type": "conf",
+          "type": "file",
           "file": "env.sh"
         }
       },
       {
         "name": "conf.ssl.enabled",
         "kind": {
-          "type": "conf",
+          "type": "file",
           "file": "my.config"
         }
       }
@@ -382,14 +382,14 @@
       {
         "name": "ENV_SSL_CERTIFICATE_PATH",
         "kind": {
-          "type": "conf",
+          "type": "file",
           "file": "env.sh"
         }
       },
       {
         "name": "conf.ssl.certificate.path",
         "kind": {
-          "type": "conf",
+          "type": "file",
           "file": "my.config"
         }
       }
@@ -415,14 +415,14 @@
           {
             "name": "ENV_SSL_ENABLED",
             "kind": {
-              "type": "conf",
+              "type": "file",
               "file": "env.sh"
             }
           },
           {
             "name": "conf.ssl.enabled",
             "kind": {
-              "type": "conf",
+              "type": "file",
               "file": "my.config"
             }
           }

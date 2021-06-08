@@ -46,7 +46,7 @@ impl fmt::Display for PropertyName {
 #[derive(Deserialize, Clone, Debug, Hash, Eq, PartialOrd, PartialEq)]
 #[serde(tag = "type", content = "file", rename_all = "lowercase")]
 pub enum PropertyNameKind {
-    Conf(String),
+    File(String),
     Env,
     Cli,
 }
@@ -54,7 +54,7 @@ pub enum PropertyNameKind {
 impl PropertyNameKind {
     pub fn get_file_name(&self) -> String {
         match self {
-            PropertyNameKind::Conf(conf) => conf.clone(),
+            PropertyNameKind::File(conf) => conf.clone(),
             _ => "".to_string(),
         }
     }
