@@ -111,7 +111,7 @@ impl ProductConfigSpec {
     ///
     /// let env_sh = config.get(
     ///     "0.5.0",
-    ///     &PropertyNameKind::Conf("env.sh".to_string()),
+    ///     &PropertyNameKind::File("env.sh".to_string()),
     ///     Some("role_1"),
     ///     &user_data,
     /// );
@@ -279,14 +279,14 @@ mod tests {
     #[rstest]
     #[case(
         VERSION_0_5_0,
-        &PropertyNameKind::Conf(CONF_FILE.to_string()),
+        &PropertyNameKind::File(CONF_FILE.to_string()),
         Some(ROLE_1),
         create_empty_data_and_expected().0,
         create_empty_data_and_expected().1,
     )]
     #[case(
       VERSION_0_5_0,
-      &PropertyNameKind::Conf(CONF_FILE.to_string()),
+      &PropertyNameKind::File(CONF_FILE.to_string()),
       Some(ROLE_1),
       create_correct_data_and_expected().0,
       create_correct_data_and_expected().1,
@@ -325,7 +325,7 @@ mod tests {
             Error::PropertyNotFound {
                 property_name: PropertyName {
                     name: "test".to_string(),
-                    kind: PropertyNameKind::Conf("my_config".to_string()),
+                    kind: PropertyNameKind::File("my_config".to_string()),
                 },
             },
         );
