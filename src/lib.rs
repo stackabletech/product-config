@@ -15,6 +15,8 @@ pub mod error;
 pub mod reader;
 pub mod ser;
 pub mod types;
+pub mod writer;
+
 mod util;
 mod validation;
 
