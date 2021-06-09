@@ -54,7 +54,7 @@ pub enum PropertyNameKind {
 impl PropertyNameKind {
     pub fn get_file_name(&self) -> String {
         match self {
-            PropertyNameKind::File(conf) => conf.clone(),
+            PropertyNameKind::File(name) => name.clone(),
             _ => "".to_string(),
         }
     }
