@@ -211,6 +211,8 @@ mod tests {
     //const ENV_SECURITY_PASSWORD: &str = "ENV_SECURITY_PASSWORD";
     const ENV_SSL_ENABLED: &str = "ENV_SSL_ENABLED";
     const ENV_SSL_CERTIFICATE_PATH: &str = "ENV_SSL_CERTIFICATE_PATH";
+    const CLI_START_FOREGROUND: &str = "start-foreground";
+    const CLI_SOME_PORT: &str = "some_cli_port";
 
     const ROLE_1: &str = "role_1";
     const VERSION_0_5_0: &str = "0.5.0";
@@ -307,12 +309,37 @@ mod tests {
 
         let result = config.get(version, kind, role, &user_data).unwrap();
 
-        println!("Size: {}", result.len());
-        for x in &result {
-            println!("{:?}", x)
-        }
-
         assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_product_get_kind_cli_role_1() {
+        let config = ProductConfigSpec::new(ConfigJsonReader::new(
+            "data/test_config_spec.json",
+            "data/test_property_spec.json",
+        ))
+        .unwrap();
+
+        let result = config
+            .get(
+                VERSION_0_5_0,
+                &PropertyNameKind::Cli,
+                Some("role_1"),
+                &HashMap::new(),
+            )
+            .unwrap();
+
+        let mut expected = HashMap::new();
+        expected.insert(
+            CLI_SOME_PORT.to_string(),
+            PropertyValidationResult::RecommendedDefault("8080".to_string()),
+        );
+        expected.insert(
+            CLI_START_FOREGROUND.to_string(),
+            PropertyValidationResult::Valid("".to_string()),
+        );
+
+        assert_eq!(result, expected)
     }
 
     #[test]

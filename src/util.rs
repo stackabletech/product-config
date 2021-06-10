@@ -10,7 +10,7 @@ use std::collections::HashMap;
 /// - match the provided kind (e.g. Conf(my.config))
 /// - match the role and are required
 /// - are available for the current product version
-/// - have dependencies dependency with a provided value or property that has recommended value
+/// - have dependencies with a provided value or property that has recommended value
 ///
 /// # Arguments
 ///
@@ -66,6 +66,10 @@ pub(crate) fn get_matching_properties(
 
                             properties.extend(dependencies);
                         }
+                    }
+                    // no recommended values: Cli or Env single parameter
+                    else if kind == &PropertyNameKind::Cli || kind == &PropertyNameKind::Env {
+                        properties.insert(property_name.name.clone(), "".to_string());
                     }
                 }
             }

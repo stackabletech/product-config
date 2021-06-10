@@ -430,5 +430,60 @@
         "value": "true"
       }
     ]
+  },
+  {
+    "property_names": [
+      {
+        "name": "start-foreground",
+        "kind": {
+          "type": "cli"
+        }
+      }
+    ],
+    "roles": [
+      {
+        "name": "role_1",
+        "required": true
+      },
+      {
+        "name": "role_2",
+        "required": false
+      }
+    ],
+    "datatype": {
+      "type": "string"
+    },
+    "as_of_version": "0.5.0"
+  },
+  {
+    "property_names": [
+      {
+        "name": "some_cli_port",
+        "kind": {
+          "type": "cli"
+        }
+      }
+    ],
+    "datatype": {
+      "type": "string",
+      "unit": "port"
+    },
+    "recommended_values": [
+      {
+        "from_version": "0.5.0",
+        "value": "8080"
+      }
+    ],
+    "roles": [
+      {
+        "name": "role_1",
+        "required": true
+      },
+      {
+        "name": "role_2",
+        "required": false
+      }
+    ],
+    "as_of_version": "0.5.0"
   }
 ]
