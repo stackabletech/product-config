@@ -3,6 +3,7 @@ use crate::types::{
     Datatype, ProductConfigSpecProperties, PropertyName, PropertySpec, PropertyValueSpec, Role,
 };
 use crate::util;
+use crate::util::semver_parse;
 use crate::PropertyValidationResult;
 use regex::Regex;
 use semver::Version;
@@ -137,7 +138,7 @@ pub(crate) fn validate_property_spec(
     property_spec: &HashMap<PropertyName, PropertySpec>,
 ) -> ValidationResult<()> {
     for (name, spec) in property_spec {
-        let as_of_version = Version::parse(&spec.as_of_version)?;
+        let as_of_version = semver_parse(&spec.as_of_version)?;
 
         // 1) check for default values
         if let Some(values) = &spec.default_values {
@@ -282,7 +283,7 @@ fn check_version_supported_or_deprecated(
     as_of_version: &str,
     deprecated_since: &Option<String>,
 ) -> ValidationResult<()> {
-    let property_version = Version::parse(as_of_version)?;
+    let property_version = semver_parse(as_of_version)?;
 
     // compare version of the property and product version
     if property_version > *version {
@@ -295,7 +296,7 @@ fn check_version_supported_or_deprecated(
 
     // check if requested property is deprecated
     if let Some(deprecated) = deprecated_since {
-        let deprecated_since_version = Version::parse(deprecated.as_ref())?;
+        let deprecated_since_version = semver_parse(deprecated.as_ref())?;
 
         if deprecated_since_version <= *version {
             return Err(Error::VersionDeprecated {

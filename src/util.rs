@@ -36,7 +36,7 @@ pub(crate) fn get_matching_properties(
 
         // Ignore this configuration property if it is only available (specified via `as_of_version`)
         // in later versions than the one we're checking against.
-        if Version::parse(spec.as_of_version.as_str())? > *product_version {
+        if semver_parse(spec.as_of_version.as_str())? > *product_version {
             continue;
         }
 
@@ -179,7 +179,7 @@ pub(crate) fn get_property_value_for_version(
 ) -> ValidationResult<PropertyValueSpec> {
     for value in property_values {
         if let Some(from) = &value.from_version {
-            let from_version = Version::parse(from)?;
+            let from_version = semver_parse(from)?;
 
             if from_version > *product_version {
                 continue;
@@ -187,7 +187,7 @@ pub(crate) fn get_property_value_for_version(
         }
 
         if let Some(to) = &value.to_version {
-            let to_version = Version::parse(to)?;
+            let to_version = semver_parse(to)?;
 
             if to_version < *product_version {
                 continue;
@@ -202,4 +202,17 @@ pub(crate) fn get_property_value_for_version(
         property_values: Vec::from(property_values),
         version: product_version.to_string(),
     })
+}
+
+/// This is a helper method to merge SemVer errors and the product config errors. Since
+/// SemVer 1.0.X we can no longer use "thiserror" in combination with #[source] on the SemVer
+/// error (Clone, PartialOrd, PartialEq traits are no longer valid). Therefore we just pass
+/// the error string of the SemVer error into our product config error.
+pub(crate) fn semver_parse(version: &str) -> ValidationResult<Version> {
+    match Version::parse(version) {
+        Ok(version) => Ok(version),
+        Err(err) => Err(Error::InvalidVersion {
+            semver_error: err.to_string(),
+        }),
+    }
 }
