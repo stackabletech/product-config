@@ -654,7 +654,7 @@ mod tests {
     fn get_conf_property_name(name: &str, file: &str) -> PropertyName {
         PropertyName {
             name: name.to_string(),
-            kind: PropertyNameKind::Conf(file.to_string()),
+            kind: PropertyNameKind::File(file.to_string()),
         }
     }
 
@@ -740,8 +740,8 @@ mod tests {
         Err(Error::PropertyDependencyMissing {
             property_name: get_conf_property_name(ENV_SSL_CERTIFICATE_PATH, CONFIG_FILE),
             dependency: vec![
-                PropertyName { name: ENV_SSL_ENABLED.to_string(), kind: PropertyNameKind::Conf(CONFIG_FILE.to_string()) },
-                PropertyName { name: CONF_SSL_ENABLED.to_string(), kind: PropertyNameKind::Conf(CONFIG_FILE_2.to_string()) }
+                PropertyName { name: ENV_SSL_ENABLED.to_string(), kind: PropertyNameKind::File(CONFIG_FILE.to_string()) },
+                PropertyName { name: CONF_SSL_ENABLED.to_string(), kind: PropertyNameKind::File(CONFIG_FILE_2.to_string()) }
             ]
         })
     )]
