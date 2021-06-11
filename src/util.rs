@@ -7,7 +7,7 @@ use semver::Version;
 use std::collections::HashMap;
 
 /// Automatically retrieve and validate config properties from the property spec that:
-/// - match the provided kind (e.g. Conf(my.config))
+/// - match the provided kind (e.g. File(my.config))
 /// - match the role and are required
 /// - are available for the current product version
 /// - have dependencies with a provided value or property that has recommended value
