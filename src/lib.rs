@@ -17,6 +17,7 @@ pub mod ser;
 pub mod types;
 pub mod writer;
 
+mod test;
 mod util;
 mod validation;
 
