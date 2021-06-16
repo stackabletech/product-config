@@ -3,17 +3,14 @@ use crate::PropertyName;
 
 #[derive(thiserror::Error, Clone, Debug, PartialOrd, PartialEq)]
 pub enum Error {
-    #[error("file not found: {file_name}")]
+    #[error("File not found: {file_name}")]
     FileNotFound { file_name: String },
 
-    #[error("could not parse file: {file_name}: {reason}")]
+    #[error("Could not parse file: {file_name}: {reason}")]
     FileNotParsable { file_name: String, reason: String },
 
-    #[error("Invalid sem version: {source}")]
-    InvalidVersion {
-        #[from]
-        source: semver::SemVerError,
-    },
+    #[error("Invalid SemVer version: {semver_error}")]
+    InvalidVersion { semver_error: String },
 
     #[error("[{property_name}]: current product version is '{product_version}' -> property not supported; available from version '{required_version}'")]
     VersionNotSupported {
@@ -121,7 +118,7 @@ pub enum Error {
     },
 
     #[error(
-        "[{property_name}]: provided value '{user_value} does not match required value '{required_value}' for dependency '{dependency}'"
+        "[{property_name}]: provided value '{user_value}' does not match required value '{required_value}' for dependency '{dependency}'"
     )]
     PropertyDependencyValueInvalid {
         property_name: PropertyName,

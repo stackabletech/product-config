@@ -27,6 +27,7 @@ use std::string::String;
 use crate::error::Error;
 use crate::reader::ConfigReader;
 use crate::types::{ProductConfigSpecProperties, PropertyName, PropertyNameKind, PropertySpec};
+use crate::util::semver_parse;
 use crate::validation::ValidationResult;
 use semver::Version;
 
@@ -126,7 +127,7 @@ impl ProductConfigSpec {
     ) -> ValidationResult<HashMap<String, PropertyValidationResult>> {
         let mut result_config = HashMap::new();
 
-        let product_version = Version::parse(version)?;
+        let product_version = semver_parse(version)?;
 
         // merge provided user properties with extracted property spec via role / kind and
         // dependencies to be validated later.
