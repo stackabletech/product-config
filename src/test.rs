@@ -23,7 +23,7 @@ pub(crate) struct ProductConfigStatus {}
 #[derive(Clone, Debug, Deserialize, JsonSchema, Serialize)]
 pub(crate) struct SpecTest {
     pub property_name: String,
-    #[serde::pattern = ".*"]
+    //#[serde::pattern = ".*"]
     pub file: Option<Vec<String>>,
     pub env: Option<Vec<String>>,
     pub cli_arg: Option<Vec<String>>,
