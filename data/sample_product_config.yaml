@@ -1,0 +1,89 @@
+###
+### Validiert experiments::test_experiment_load_sample_product_config()
+###
+config:
+  units:
+    - bla
+roles:
+  - application: "spark"
+    names: ["master", "worker"]
+    versions: &spark_master_worker_all_versions ### dieses Anchor wird unten referenziert. kann Rust das ?
+      range: ["0.1", "3.9"]
+      list: ["2.9-bugfix", "3.0-alpha"]
+    cli:
+      command: "/foo/bar.sh start-foreground --port={{port}} {{postfix}}"
+
+      properties:
+        - name: "port"
+          nullable: false ### heisst de fakto required!
+          datatype:
+            type: "integer"
+            min: "1"
+            max: "65535"
+            unit: "port"
+          default_values:
+            - versions:
+                range: ["0.5.0", "0.9.11"]
+              value: "20000"
+            - versions:
+                list: ["2.9-bugfix"]
+              value: "30000"
+          recommended_values:
+            - versions:
+                range: ["0.5.0", "0.9.11"]
+              value: "20000"
+            - versions:
+                list: [ "3.0-alpha"]
+              value: "30000"
+
+        - name: "postfix"
+          nullable: true ### damit kann der user das kommando erweitern wenn er will
+          datatype:
+            type: "string"
+          default_values:
+            - versions: *spark_master_worker_all_versions
+              value: ""
+
+    files:
+      - name: "env.sh"
+        template: "templates/spark/common/version-123/env.sh.template"
+        
+        properties:
+          - name: "MASTER_PORT"
+            datatype:
+              type: "integer"
+              min: "1"
+              max: "65535"
+              unit: "port"
+            recommended_values:
+              - versions:
+                  range: ["0.5.0", "0.9.11"]
+                value: "20000"
+
+              - versions:
+                  list: [ "1.0.0", "2.0.0"]
+                value: "30000"
+
+    env:
+      properties:
+        - name: "MASTER_PORT"
+          nullable: false ### heisst de fakto required!
+          datatype:
+            type: "integer"
+            min: "1"
+            max: "65535"
+            unit: "port"
+          default_values:
+            - versions:
+                range: ["0.5.0", "0.9.11"]
+              value: "20000"
+            - versions:
+                list: ["2.9-bugfix"]
+              value: "30000"
+          recommended_values:
+            - versions:
+                range: ["0.5.0", "0.9.11"]
+              value: "20000"
+            - versions:
+                list: [ "3.0-alpha"]
+              value: "30000"
