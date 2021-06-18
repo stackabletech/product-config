@@ -26,7 +26,13 @@ pub struct ProductConfigStatus {}
 
 #[derive(Clone, Debug, Deserialize, JsonSchema, Serialize)]
 struct Config {
-    units: Vec<HashMap<String, Unit>>,
+    units: Vec<ConfigUnit>,
+}
+
+/// This is a trade off we have to deal with to allow rust and serde to work with anchor references
+#[derive(Clone, Debug, Deserialize, JsonSchema, Serialize)]
+struct ConfigUnit {
+    unit: Unit,
 }
 
 /// Represents the config unit (name corresponds to the unit type like password and a given regex)
@@ -50,7 +56,13 @@ struct Application {
 #[derive(Clone, Debug, Deserialize, JsonSchema, Serialize)]
 struct Cli {
     command: String,
-    properties: Vec<Property>,
+    properties: Vec<ApplicationProperty>,
+}
+
+/// This is a trade off we have to deal with to allow rust and serde to work with anchor references
+#[derive(Clone, Debug, Deserialize, JsonSchema, Serialize)]
+struct ApplicationProperty {
+    property: Property,
 }
 
 #[derive(Clone, Debug, Deserialize, JsonSchema, Serialize)]
@@ -60,9 +72,8 @@ struct Property {
     datatype: Datatype,
     default_values: Option<Vec<PropertyValue>>,
     recommended_values: Option<Vec<PropertyValue>>,
-
     deprecated: Option<Vec<Deprecated>>,
-    //depends_on: Option<Vec<Box<Property>>>,
+    depends_on: Option<Vec<ApplicationProperty>>,
 }
 
 #[derive(Clone, Debug, Deserialize, JsonSchema, Serialize)]

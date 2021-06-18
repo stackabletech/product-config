@@ -28,63 +28,63 @@ applications:
       command: "/foo/bar.sh start-foreground --port={{port}} {{postfix}}"
 
       properties:
-        - <<: &dependant_value
-          name: "dependency"
-          nullable: false # damit kann der user das kommando erweitern wenn er will
-          datatype:
-            kind: "string"
-          default_values:
-            - versions: *spark_master_worker_all_versions
-              value: ""
-        - name: "port"
-          nullable: false ### heisst de fakto required!
-          datatype:
-            kind: "integer"
-            min: "1"
-            max: "65535"
-            unit: *unit_port
-            #allowed_values: ["a", "b"]
-          default_values:
-            - versions:
-                from: "0.5.0"
-                to: "0.9.11"
-              value: "20000"
-            - versions:
-                list: ["2.9-bugfix"]
-              value: "30000"
-          recommended_values:
-            - versions:
-                from: "0.5.0"
-                to: "0.9.11"
-              value: "20000"
-            - versions:
-                list: [ "3.0-alpha"]
-              value: "30000"
-          deprecated:
-            - versions:
-                from: "0.5"
-              message: "This property is deprecated blabla..."
-          depends_on:
-            - property:
-                <<: *dependant_value
+        - property: &dependant_property
+            name: "dependant_property"
+            nullable: false # damit kann der user das kommando erweitern wenn er will
+            datatype:
+              kind: "string"
+            default_values:
+              - versions: *spark_master_worker_all_versions
+                value: ""
+        - property:
+            name: "port"
+            nullable: false ### heisst de fakto required!
+            datatype:
+              kind: "integer"
+              min: "1"
+              max: "65535"
+              unit: *unit_port
+              #allowed_values: ["a", "b"]
+            default_values:
+              - versions:
+                  from: "0.5.0"
+                  to: "0.9.11"
+                value: "20000"
+              - versions:
+                  list: ["2.9-bugfix"]
+                value: "30000"
+            recommended_values:
+              - versions:
+                  from: "0.5.0"
+                  to: "0.9.11"
+                value: "20000"
+              - versions:
+                  list: [ "3.0-alpha"]
+                value: "30000"
+            deprecated:
+              - versions:
+                  from: "0.5"
+                message: "This property is deprecated blabla..."
+            depends_on:
+              - property: *dependant_property
                 recommended_value:
                   - versions:
                       from: "0.5.0"
                       to: "0.9.11"
                     value: "42"
-          restart_required: "true"
-          tags: ["network", "port"]
-          additional_doc: "some_doc"
-          comment: "Always has to be present"
-          description: "The port where clients connect to."
-
-        - name: "postfix"
-          nullable: true ### damit kann der user das kommando erweitern wenn er will
-          datatype:
-            kind: "string"
-          default_values:
-            - versions: *spark_master_worker_all_versions
-              value: ""
+            restart_required: "true"
+            tags: ["network", "port"]
+            additional_doc: "some_doc"
+            comment: "Always has to be present"
+            description: "The port where clients connect to."
+        - property:
+            name: "postfix"
+            nullable: true ### damit kann der user das kommando erweitern wenn er will
+            datatype:
+              kind: "string"
+            default_values:
+              - versions: *spark_master_worker_all_versions
+                value: ""
 
     files:
       - name: "env.sh"
