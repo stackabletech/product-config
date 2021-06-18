@@ -92,7 +92,7 @@ applications:
 
         properties:
           - property:
-              name: "MASTER_PORT"
+              name: "master.port"
               datatype:
                 kind: "integer"
                 min: "1"

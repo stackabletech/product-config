@@ -1,8 +1,9 @@
-use kube::CustomResource;
-use regex::Regex;
+use crate::error::Error;
+//use kube::CustomResource;
+//use regex::Regex;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 // #[derive(Clone, CustomResource, Debug, Deserialize, JsonSchema, Serialize)]
 // #[kube(
@@ -17,6 +18,9 @@ use std::collections::HashMap;
 #[derive(Clone, Debug, Deserialize, JsonSchema, Serialize)]
 //pub struct ProductConfigSpec {
 pub struct ProductConfig {
+    // TODO: Im ok with applications but shouldnt it be products?
+    //   If we stick to ProductConfig i would change this to products
+    //   (check comment on Application as well)
     config: Config,
     applications: Vec<Application>,
 }
@@ -46,9 +50,14 @@ struct Unit {
 
 #[derive(Clone, Debug, Deserialize, JsonSchema, Serialize)]
 struct Application {
+    // TODO: Im ok with Application but shouldnt it be product?
+    //   If we stick to ProductConfig i would change this to product and the
+    //   member "product" simply to "name".
     product: String,
     roles: Vec<String>,
     versions: ProductVersion,
+    // TODO: Thought process here: We always need Cli for the command. We do not require any properties
+    //    file and env may even be empty in a very minimum config.
     cli: Cli,
     file: Option<File>,
     env: Option<Env>,
@@ -57,6 +66,7 @@ struct Application {
 #[derive(Clone, Debug, Deserialize, JsonSchema, Serialize)]
 struct Cli {
     command: String,
+    // TODO: Thought process here: We always need Cli for the command. We do not require any properties
     properties: Option<Vec<ApplicationProperty>>,
 }
 
@@ -64,17 +74,21 @@ struct Cli {
 struct File {
     name: String,
     template: Option<String>,
+    // TODO: Thought process here: If we want to write to a file we need sth to write, so no
+    //    option in my opinion
     properties: Vec<ApplicationProperty>,
 }
 
 #[derive(Clone, Debug, Deserialize, JsonSchema, Serialize)]
 struct Env {
+    // TODO: Thought process here: Same as above if i specify env i need to specify properties.
     properties: Vec<ApplicationProperty>,
 }
 
 /// This is a trade off we have to deal with to allow rust and serde to work with anchor references
 #[derive(Clone, Debug, Deserialize, JsonSchema, Serialize)]
 struct ApplicationProperty {
+    // TODO: Not happy with the naming
     property: Property,
 }
 
@@ -88,6 +102,10 @@ struct Property {
     deprecated: Option<Vec<Deprecated>>,
     depends_on: Option<Vec<ApplicationProperty>>,
     restart_required: Option<bool>,
+    //  TODO: I like tags for searching / sorting. I think the mix between doc, comment, description
+    //   might be some overkill. Additional_docs was for url or links related to the property,
+    //   comment just something random or helpful and description is the actual property description.
+    //   Come to think of it maybe we just keep it like that.
     tags: Option<Vec<String>>,
     additional_doc: Option<String>,
     comment: Option<String>,
@@ -119,6 +137,8 @@ struct Datatype {
     max: Option<String>,
     unit: Option<Unit>,
     allowed_values: Option<Vec<String>>,
+    // TODO: do we need allowed_units?
+    //   I think we cover that with different regex patterns in config.units
 }
 
 #[derive(Clone, Debug, Deserialize, JsonSchema, Serialize)]
@@ -129,6 +149,8 @@ enum DatatypeKind {
     Float,
     String,
     Enum,
+    // TODO: I am still missing some kind of collection types like list or map
+    //    enum just covers a list with fixed elements
 }
 
 #[derive(Clone, Debug, Deserialize, JsonSchema, Serialize)]
@@ -136,6 +158,40 @@ struct ProductVersion {
     from: Option<String>,
     to: Option<String>,
     list: Option<Vec<String>>,
+}
+
+/// This is the final product configuration the operator receives.
+/// Contains config files, env variables and cli commands / parameters.
+/// It is up to the operator to decide what to do with the PropertyValidationResult.
+#[derive(Clone, Debug)]
+pub struct ProductConfiguration {
+    // Map<FileName, Map<Property, ValidatedValue>
+    // TODO: How do we introduce the templates here?
+    //   If we use templates we can not work on that type here.
+    pub files: Option<BTreeMap<String, BTreeMap<String, PropertyValidationResult>>>,
+    // Map<Property, ValidatedValue>
+    pub env: Option<BTreeMap<String, Option<PropertyValidationResult>>>,
+    // e.g. ["./start.sh", "some_command", "--some_flag", "-p", "some_parameter"]
+    pub cli: Vec<String>,
+}
+
+/// This will be returned for every validated configuration value (including user values
+/// and automatically added values from e.g. dependency, recommended etc.).
+#[derive(Clone, Debug, PartialOrd, PartialEq)]
+pub enum PropertyValidationResult {
+    /// On Default, the provided value does not differ from the default settings and may be
+    /// left out from the user config in the future.
+    Default(String),
+    /// On RecommendedDefault, the value for this configuration property is a recommended value.
+    /// Will be returned when the user did not provide a value and the product does not have a default.
+    RecommendedDefault(String),
+    /// On Valid, the value passed all checks and can be used.
+    Valid(String),
+    /// On warn, the value maybe used with caution.
+    Warn(String, Error),
+    /// On error, check the provided config and config values.
+    /// Should never be used like this!
+    Error(Error),
 }
 
 #[cfg(test)]
