@@ -61,8 +61,13 @@ applications:
                     from: "0.5"
                   message: "This property is deprecated blabla..."
               depends_on:
-                - property: *dependant_value
-                  value: "some_value"
+                - property:
+                    <<: *dependant_value
+                    recommended_value:
+                      - versions:
+                          from: "0.5.0"
+                          to: "0.9.11"
+                        value: "42"
               restart_required: "true"
               tags: ["network", "port"]
               additional_doc: "some_doc"
