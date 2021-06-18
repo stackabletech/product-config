@@ -17,34 +17,114 @@ spec:
       name: v1
       schema:
         openAPIV3Schema:
-          description: "Auto-generated derived type for Spec via `CustomResource`"
+          description: "Auto-generated derived type for ProductConfigSpec via `CustomResource`"
           properties:
             spec:
               properties:
-                properties:
+                applications:
                   items:
-                    description: Represents one property spec entry for a given property
                     properties:
-                      kind:
-                        description: "Represents different config identifier types like config file, environment variable, command line parameter etc."
-                        enum:
-                          - file
-                          - env
-                          - cli
+                      cli:
+                        properties:
+                          command:
+                            type: string
+                          properties:
+                            items:
+                              properties:
+                                default_values:
+                                  items:
+                                    properties:
+                                      value:
+                                        nullable: true
+                                        type: string
+                                      versions:
+                                        properties:
+                                          from:
+                                            nullable: true
+                                            type: string
+                                          list:
+                                            items:
+                                              type: string
+                                            nullable: true
+                                            type: array
+                                          to:
+                                            nullable: true
+                                            type: string
+                                        type: object
+                                    required:
+                                      - versions
+                                    type: object
+                                  type: array
+                                name:
+                                  type: string
+                                nullable:
+                                  type: boolean
+                              required:
+                                - default_values
+                                - name
+                                - nullable
+                              type: object
+                            type: array
+                        required:
+                          - command
+                          - properties
+                        type: object
+                      product:
                         type: string
-                      number:
-                        format: int16
-                        type: integer
-                      text:
-                        type: string
+                      roles:
+                        items:
+                          type: string
+                        type: array
+                      versions:
+                        properties:
+                          from:
+                            nullable: true
+                            type: string
+                          list:
+                            items:
+                              type: string
+                            nullable: true
+                            type: array
+                          to:
+                            nullable: true
+                            type: string
+                        type: object
                     required:
-                      - kind
-                      - number
-                      - text
+                      - cli
+                      - product
+                      - roles
+                      - versions
                     type: object
                   type: array
+                config:
+                  properties:
+                    units:
+                      items:
+                        description: Represents the config unit (name corresponds to the unit type like password and a given regex)
+                        properties:
+                          comment:
+                            nullable: true
+                            type: string
+                          examples:
+                            items:
+                              type: string
+                            nullable: true
+                            type: array
+                          name:
+                            type: string
+                          regex:
+                            type: string
+                        required:
+                          - name
+                          - regex
+                        type: object
+                      type: array
+                  required:
+                    - units
+                  type: object
               required:
-                - properties
+                - applications
+                - config
               type: object
             status:
               nullable: true
