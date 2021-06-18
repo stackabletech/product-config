@@ -18,11 +18,8 @@ use std::collections::BTreeMap;
 #[derive(Clone, Debug, Deserialize, JsonSchema, Serialize)]
 //pub struct ProductConfigSpec {
 pub struct ProductConfig {
-    // TODO: Im ok with applications but shouldnt it be products?
-    //   If we stick to ProductConfig i would change this to products
-    //   (check comment on Application as well)
     config: Config,
-    applications: Vec<Application>,
+    products: Vec<Product>,
 }
 
 #[derive(Clone, Debug, Deserialize, JsonSchema, Serialize)]
@@ -49,15 +46,10 @@ struct Unit {
 }
 
 #[derive(Clone, Debug, Deserialize, JsonSchema, Serialize)]
-struct Application {
-    // TODO: Im ok with Application but shouldnt it be product?
-    //   If we stick to ProductConfig i would change this to product and the
-    //   member "product" simply to "name".
-    product: String,
+struct Product {
+    name: String,
     roles: Vec<String>,
     versions: ProductVersion,
-    // TODO: Thought process here: We always need Cli for the command. We do not require any properties
-    //    file and env may even be empty in a very minimum config.
     cli: Cli,
     file: Option<File>,
     env: Option<Env>,
@@ -66,7 +58,6 @@ struct Application {
 #[derive(Clone, Debug, Deserialize, JsonSchema, Serialize)]
 struct Cli {
     command: String,
-    // TODO: Thought process here: We always need Cli for the command. We do not require any properties
     properties: Option<Vec<ApplicationProperty>>,
 }
 
@@ -81,7 +72,6 @@ struct File {
 
 #[derive(Clone, Debug, Deserialize, JsonSchema, Serialize)]
 struct Env {
-    // TODO: Thought process here: Same as above if i specify env i need to specify properties.
     properties: Vec<ApplicationProperty>,
 }
 
