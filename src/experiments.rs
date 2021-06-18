@@ -9,6 +9,7 @@ mod experiments {
     fn test_experiment_load_sample_product_config() -> Result<(), Box<dyn Error>> {
         let contents = fs::read_to_string("data/sample_product_config.yaml")?;
         let sample = YamlLoader::load_from_str(contents.as_str())?;
+        println!("{:?}", sample);
         assert_eq!(1, sample.len());
         Ok(())
     }
