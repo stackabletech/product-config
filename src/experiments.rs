@@ -49,13 +49,26 @@ struct Application {
     product: String,
     roles: Vec<String>,
     versions: ProductVersion,
-    cli: Cli, //file:
-              //env:
+    cli: Cli,
+    file: Option<File>,
+    env: Option<Env>,
 }
 
 #[derive(Clone, Debug, Deserialize, JsonSchema, Serialize)]
 struct Cli {
     command: String,
+    properties: Option<Vec<ApplicationProperty>>,
+}
+
+#[derive(Clone, Debug, Deserialize, JsonSchema, Serialize)]
+struct File {
+    name: String,
+    template: Option<String>,
+    properties: Vec<ApplicationProperty>,
+}
+
+#[derive(Clone, Debug, Deserialize, JsonSchema, Serialize)]
+struct Env {
     properties: Vec<ApplicationProperty>,
 }
 
@@ -74,6 +87,11 @@ struct Property {
     recommended_values: Option<Vec<PropertyValue>>,
     deprecated: Option<Vec<Deprecated>>,
     depends_on: Option<Vec<ApplicationProperty>>,
+    restart_required: Option<bool>,
+    tags: Option<Vec<String>>,
+    additional_doc: Option<String>,
+    comment: Option<String>,
+    description: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, JsonSchema, Serialize)]
