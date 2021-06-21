@@ -158,9 +158,9 @@ pub struct ProductConfiguration {
     // Map<FileName, Map<Property, ValidatedValue>
     // TODO: How do we introduce the templates here?
     //   If we use templates we can not work on that type here.
-    pub files: Option<BTreeMap<String, BTreeMap<String, PropertyValidationResult>>>,
+    pub files: BTreeMap<String, BTreeMap<String, PropertyValidationResult>>,
     // Map<Property, ValidatedValue>
-    pub env: Option<BTreeMap<String, Option<PropertyValidationResult>>>,
+    pub env: BTreeMap<String, Option<PropertyValidationResult>>,
     // e.g. ["./start.sh", "some_command", "--some_flag", "-p", "some_parameter"]
     pub cli: Vec<String>,
 }

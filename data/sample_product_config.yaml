@@ -18,118 +18,96 @@ config:
 
 products:
   - name: "spark"
-    roles: ["master", "worker"]
-    versions: &spark_master_worker_all_versions ### dieses Anchor wird unten referenziert. kann Rust das ?
+    versions: &spark_master_worker_all_versions
       from: "0.1"
-      to: "3.9"
+      to: "2.0"
       list: ["2.9-bugfix", "3.0-alpha"]
 
-    cli:
-      command: "/foo/bar.sh start-foreground --port={{port}} {{postfix}}"
-
-      properties:
-        - property: &dependant_property
-            name: "dependant_property"
-            nullable: false # damit kann der user das kommando erweitern wenn er will
-            datatype:
-              kind: "string"
-            default_values:
-              - versions: *spark_master_worker_all_versions
-                value: ""
-        - property:
-            name: "port"
-            nullable: false ### heisst de fakto required!
-            datatype:
-              kind: "integer"
-              min: "1"
-              max: "65535"
-              unit: *unit_port
-              #allowed_values: ["a", "b"]
-            default_values:
-              - versions:
-                  from: "0.5.0"
-                  to: "0.9.11"
-                value: "20000"
-              - versions:
-                  list: ["2.9-bugfix"]
-                value: "30000"
-            recommended_values:
-              - versions:
-                  from: "0.5.0"
-                  to: "0.9.11"
-                value: "20000"
-              - versions:
-                  list: [ "3.0-alpha"]
-                value: "30000"
-            deprecated:
-              - versions:
-                  from: "0.5"
-                message: "This property is deprecated blabla..."
-            depends_on:
-              - property: *dependant_property
-                recommended_value:
-                  - versions:
-                      from: "0.5.0"
-                      to: "0.9.11"
-                    value: "42"
-            restart_required: true
-            tags: ["network", "port"]
-            additional_doc: "some_doc"
-            comment: "Always has to be present"
-            description: "The port where clients connect to."
-        - property:
-            name: "postfix"
-            nullable: true ### damit kann der user das kommando erweitern wenn er will
-            datatype:
-              kind: "string"
-            default_values:
-              - versions: *spark_master_worker_all_versions
-                value: ""
-
-    files:
-      - name: "env.sh"
-        template: "templates/spark/common/version-123/env.sh.template"
-
-        properties:
-          - property:
-              name: "master.port"
-              datatype:
-                kind: "integer"
-                min: "1"
-                max: "65535"
-                unit: *unit_port
-              recommended_values:
+    properties:
+      - property: &foo_port
+          name: "foo_port"
+          nullable: false
+          datatype:
+            kind: "integer"
+            unit: *unit_port
+          recommended_values:
+            - versions: *spark_master_worker_all_versions
+              value: "10000"
+      - property: &bar
+          name: "bar"
+          nullable: false
+          datatype:
+            kind: "string"
+          default_values:
+            - versions:
+                from: "0.5.0"
+                to: "0.9.11"
+              value: "20000"
+            - versions:
+                list: [ "2.9-bugfix" ]
+              value: "30000"
+          recommended_values:
+            - versions:
+                from: "0.5.0"
+                to: "0.9.11"
+              value: "20000"
+            - versions:
+                list: [ "3.0-alpha" ]
+              value: "30000"
+          deprecated:
+            - versions:
+                from: "0.5"
+              message: "This property is deprecated blabla..."
+      - property: &foo
+          name: "foo"
+          nullable: false
+          datatype:
+            kind: "integer"
+            min: 1000
+            max: 12000
+          recommended_values:
+            - versions: *spark_master_worker_all_versions
+              value: "10000"
+          deprecated:
+            - versions:
+                from: "0.5"
+              message: "This property is deprecated blabla..."
+          depends_on:
+            - property: *bar
+              recommended_value:
                 - versions:
                     from: "0.5.0"
                     to: "0.9.11"
-                  value: "20000"
-                - versions:
-                    list: [ "1.0.0", "2.0.0"]
-                  value: "30000"
+                  value: "42"
 
-    env:
-      properties:
-        - property:
-            name: "MASTER_PORT"
-            nullable: false ### heisst de fakto required!
-            datatype:
-              kind: "integer"
-              min: "1"
-              max: "65535"
-              unit: *unit_port
-            default_values:
-              - versions:
-                  from: "0.5.0"
-                  to: "0.9.11"
-                value: "20000"
-              - versions:
-                  list: ["2.9-bugfix"]
-                value: "30000"
-            recommended_values:
-              - versions:
-                  from: "0.5.0"
-                  to: "0.9.11"
-                value: "20000"
-              - versions:
-                  list: [ "3.0-alpha"]
-                value: "30000"
+    commands:
+      - name: "start"
+        version:
+        command: "./start.sh start master"
+        commandArgs: "..."
+        roles: ["master"]
+        cli:
+          - *foo_port
+          - *bar
+        files:
+          - name: "my_properties.conf"
+            - properties:
+                - *foo_port
+          - name: "my_env.sh"
+              properties:
+                - *bar
+      - name: "start"
+        version:
+        command: "./start.sh start worker"
+        commandArgs: "--port={{port}} {{postfix}} x=a,b,c y=[a;b;c]"
+        roles: ["worker"]
+        cli:
+          - *foo_port
+        files:
+          - name: "my_properties.conf"
+            template: "java/hadoop.xml/custom"
+            properties:
+              - *foo_port
+          - name: "my_env.sh"
+            properties:
+              - *foo
