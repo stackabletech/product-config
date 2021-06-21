@@ -6,19 +6,18 @@
   ###
   ### Validiert experiments::test_experiment_load_sample_product_config()
   ###
-config:
-  units:
-    - unit: &unit_url
-        name: "url"
-        regex: "^((spark|https?|ftp|file)://)?[-a-zA-Z0-9+&@#}\\/%?=~_|!:,.;]*[-a-zA-Z0-9+&@#\\/%=~_|]"
-        examples: ["https://www.stackable.de/blog/"]
-    - unit: &unit_port
-        name: "port"
-        regex: "^([0-9]{1,4}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])$"
+units:
+  - unit: &unit_url
+      name: "url"
+      regex: "^((spark|https?|ftp|file)://)?[-a-zA-Z0-9+&@#}\\/%?=~_|!:,.;]*[-a-zA-Z0-9+&@#\\/%=~_|]"
+      examples: ["https://www.stackable.de/blog/"]
+  - unit: &unit_port
+      name: "port"
+      regex: "^([0-9]{1,4}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])$"
 
 products:
   - name: "spark"
-    versions: &spark_master_worker_all_versions
+    version: &spark_master_worker_all_versions
       from: "0.1"
       to: "2.0"
       list: ["2.9-bugfix", "3.0-alpha"]
@@ -83,31 +82,45 @@ products:
     commands:
       - name: "start"
         version:
+          from: "0.1"
+          to: "2.0"
+          list: ["2.9-bugfix", "3.0-alpha"]
         command: "./start.sh start master"
-        commandArgs: "..."
+        # TODO: remove?
+        # commandArgs: "..."
         roles: ["master"]
         cli:
           - *foo_port
           - *bar
+        env:
+          - *foo_port
+          - *bar
         files:
           - name: "my_properties.conf"
-            - properties:
-                - *foo_port
+            template: "javaproperties" ### or hadoopxml
+            properties:
+              - *foo_port
           - name: "my_env.sh"
-              properties:
-                - *bar
+            template: "javaproperties" ### or hadoopxml
+            properties:
+              - *bar
       - name: "start"
         version:
+          from: "0.1"
+          to: "2.0"
+          list: ["2.9-bugfix", "3.0-alpha"]
         command: "./start.sh start worker"
         commandArgs: "--port={{port}} {{postfix}} x=a,b,c y=[a;b;c]"
         roles: ["worker"]
+        env: []
         cli:
           - *foo_port
         files:
           - name: "my_properties.conf"
-            template: "java/hadoop.xml/custom"
+            template: "javaproperties" ### or hadoopxml
             properties:
               - *foo_port
           - name: "my_env.sh"
+            template: "javaproperties" ### or hadoopxml
             properties:
               - *foo

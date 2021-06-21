@@ -18,21 +18,16 @@ use std::collections::BTreeMap;
 #[derive(Clone, Debug, Deserialize, JsonSchema, Serialize)]
 //pub struct ProductConfigSpec {
 pub struct ProductConfig {
-    config: Config,
+    units: Vec<UnitDef>,
     products: Vec<Product>,
 }
 
 #[derive(Clone, Debug, Deserialize, JsonSchema, Serialize)]
 pub struct ProductConfigStatus {}
 
-#[derive(Clone, Debug, Deserialize, JsonSchema, Serialize)]
-struct Config {
-    units: Vec<ConfigUnit>,
-}
-
 /// This is a trade off we have to deal with to allow rust and serde to work with anchor references
 #[derive(Clone, Debug, Deserialize, JsonSchema, Serialize)]
-struct ConfigUnit {
+struct UnitDef {
     unit: Unit,
 }
 
@@ -48,36 +43,40 @@ struct Unit {
 #[derive(Clone, Debug, Deserialize, JsonSchema, Serialize)]
 struct Product {
     name: String,
-    roles: Vec<String>,
-    versions: ProductVersion,
-    cli: Cli,
-    file: Option<File>,
-    env: Option<Env>,
+    version: ProductVersion,
+    properties: Vec<PropertyDef>,
+    commands: Vec<Command>,
 }
 
 #[derive(Clone, Debug, Deserialize, JsonSchema, Serialize)]
-struct Cli {
+struct Command {
+    name: String,
+    version: ProductVersion,
     command: String,
-    properties: Option<Vec<ApplicationProperty>>,
+    // TODO: remove ?
+    //commandArgs: Vec<(String, String)>
+    roles: Vec<String>,
+    cli: Vec<Property>,
+    files: Vec<File>,
+    env: Vec<Property>,
 }
 
 #[derive(Clone, Debug, Deserialize, JsonSchema, Serialize)]
 struct File {
     name: String,
-    template: Option<String>,
-    // TODO: Thought process here: If we want to write to a file we need sth to write, so no
-    //    option in my opinion
-    properties: Vec<ApplicationProperty>,
+    template: FileTemplateName,
+    properties: Vec<Property>,
 }
-
 #[derive(Clone, Debug, Deserialize, JsonSchema, Serialize)]
-struct Env {
-    properties: Vec<ApplicationProperty>,
+#[serde(rename_all = "lowercase")]
+enum FileTemplateName {
+    HadoopXml,
+    JavaProperties,
 }
 
 /// This is a trade off we have to deal with to allow rust and serde to work with anchor references
 #[derive(Clone, Debug, Deserialize, JsonSchema, Serialize)]
-struct ApplicationProperty {
+struct PropertyDef {
     // TODO: Not happy with the naming
     property: Property,
 }
@@ -90,7 +89,7 @@ struct Property {
     default_values: Option<Vec<PropertyValue>>,
     recommended_values: Option<Vec<PropertyValue>>,
     deprecated: Option<Vec<Deprecated>>,
-    depends_on: Option<Vec<ApplicationProperty>>,
+    depends_on: Option<Vec<PropertyDef>>,
     restart_required: Option<bool>,
     //  TODO: I like tags for searching / sorting. I think the mix between doc, comment, description
     //   might be some overkill. Additional_docs was for url or links related to the property,
