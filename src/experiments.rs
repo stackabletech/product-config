@@ -5,34 +5,27 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
-// #[derive(Clone, CustomResource, Debug, Deserialize, JsonSchema, Serialize)]
-// #[kube(
-//     group = "productconfig.stackable.tech",
-//     version = "v1",
-//     kind = "ProductConfig",
-//     shortname = "pc",
-//     namespaced
-// )]
-// #[kube(status = "ProductConfigStatus")]
-// #[serde(rename_all = "camelCase")]
 #[derive(Clone, Debug, Deserialize, JsonSchema, Serialize)]
-//pub struct ProductConfigSpec {
+#[serde(rename_all = "camelCase")]
 pub struct ProductConfig {
     units: Vec<UnitDef>,
     products: Vec<Product>,
 }
 
 #[derive(Clone, Debug, Deserialize, JsonSchema, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ProductConfigStatus {}
 
 /// This is a trade off we have to deal with to allow rust and serde to work with anchor references
 #[derive(Clone, Debug, Deserialize, JsonSchema, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct UnitDef {
     unit: Unit,
 }
 
 /// Represents the config unit (name corresponds to the unit type like password and a given regex)
 #[derive(Clone, Debug, Deserialize, JsonSchema, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct Unit {
     pub name: String,
     pub regex: String,
@@ -41,6 +34,7 @@ struct Unit {
 }
 
 #[derive(Clone, Debug, Deserialize, JsonSchema, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct Product {
     name: String,
     version: ProductVersion,
@@ -49,12 +43,11 @@ struct Product {
 }
 
 #[derive(Clone, Debug, Deserialize, JsonSchema, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct Command {
     name: String,
     version: ProductVersion,
-    command: String,
-    // TODO: remove ?
-    //commandArgs: Vec<(String, String)>
+    command: Vec<String>,
     roles: Vec<String>,
     cli: Vec<Property>,
     files: Vec<File>,
@@ -62,26 +55,30 @@ struct Command {
 }
 
 #[derive(Clone, Debug, Deserialize, JsonSchema, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct File {
     name: String,
     template: FileTemplateName,
     properties: Vec<Property>,
 }
 #[derive(Clone, Debug, Deserialize, JsonSchema, Serialize)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "camelCase")]
 enum FileTemplateName {
     HadoopXml,
     JavaProperties,
+    Value,
 }
 
 /// This is a trade off we have to deal with to allow rust and serde to work with anchor references
 #[derive(Clone, Debug, Deserialize, JsonSchema, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct PropertyDef {
     // TODO: Not happy with the naming
     property: Property,
 }
 
 #[derive(Clone, Debug, Deserialize, JsonSchema, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct Property {
     name: String,
     nullable: bool,
@@ -91,10 +88,6 @@ struct Property {
     deprecated: Option<Vec<Deprecated>>,
     depends_on: Option<Vec<PropertyDef>>,
     restart_required: Option<bool>,
-    //  TODO: I like tags for searching / sorting. I think the mix between doc, comment, description
-    //   might be some overkill. Additional_docs was for url or links related to the property,
-    //   comment just something random or helpful and description is the actual property description.
-    //   Come to think of it maybe we just keep it like that.
     tags: Option<Vec<String>>,
     additional_doc: Option<String>,
     comment: Option<String>,
@@ -102,24 +95,28 @@ struct Property {
 }
 
 #[derive(Clone, Debug, Deserialize, JsonSchema, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct Deprecated {
     versions: ProductVersion,
     message: String,
 }
 
 #[derive(Clone, Debug, Deserialize, JsonSchema, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct Dependency {
     versions: ProductVersion,
     message: String,
 }
 
 #[derive(Clone, Debug, Deserialize, JsonSchema, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct PropertyValue {
     versions: ProductVersion,
     value: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, JsonSchema, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct Datatype {
     kind: DatatypeKind,
     min: Option<String>,
@@ -131,7 +128,7 @@ struct Datatype {
 }
 
 #[derive(Clone, Debug, Deserialize, JsonSchema, Serialize)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "camelCase")]
 enum DatatypeKind {
     Bool,
     Integer,
@@ -143,6 +140,7 @@ enum DatatypeKind {
 }
 
 #[derive(Clone, Debug, Deserialize, JsonSchema, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct ProductVersion {
     from: Option<String>,
     to: Option<String>,
@@ -151,36 +149,24 @@ struct ProductVersion {
 
 /// This is the final product configuration the operator receives.
 /// Contains config files, env variables and cli commands / parameters.
-/// It is up to the operator to decide what to do with the PropertyValidationResult.
 #[derive(Clone, Debug)]
+// TODO: find better name
 pub struct ProductConfiguration {
-    // Map<FileName, Map<Property, ValidatedValue>
-    // TODO: How do we introduce the templates here?
-    //   If we use templates we can not work on that type here.
-    pub files: BTreeMap<String, BTreeMap<String, PropertyValidationResult>>,
-    // Map<Property, ValidatedValue>
-    pub env: BTreeMap<String, Option<PropertyValidationResult>>,
-    // e.g. ["./start.sh", "some_command", "--some_flag", "-p", "some_parameter"]
-    pub cli: Vec<String>,
+    // Map<FileName, FileContent>
+    pub files: BTreeMap<String, String>,
+    // Map<PropertyName, ValidatedValue>
+    pub env: BTreeMap<String, String>,
+    // e.g. "./start.sh some_command --some_flag --p some_parameter"
+    pub cli: String,
 }
 
-/// This will be returned for every validated configuration value (including user values
-/// and automatically added values from e.g. dependency, recommended etc.).
-#[derive(Clone, Debug, PartialOrd, PartialEq)]
-pub enum PropertyValidationResult {
-    /// On Default, the provided value does not differ from the default settings and may be
-    /// left out from the user config in the future.
-    Default(String),
-    /// On RecommendedDefault, the value for this configuration property is a recommended value.
-    /// Will be returned when the user did not provide a value and the product does not have a default.
-    RecommendedDefault(String),
-    /// On Valid, the value passed all checks and can be used.
-    Valid(String),
-    /// On warn, the value maybe used with caution.
-    Warn(String, Error),
-    /// On error, check the provided config and config values.
-    /// Should never be used like this!
-    Error(Error),
+/// This is required in operator-rs in order to pass the user config and user overrides to
+/// the product-config.
+pub struct UserConfigAndOverrides {
+    config: BTreeMap<String, String>,
+    files: BTreeMap<String, BTreeMap<String, String>>,
+    env: BTreeMap<String, String>,
+    cli: Vec<String>,
 }
 
 #[cfg(test)]
@@ -193,7 +179,7 @@ mod experiments {
 
     #[test]
     fn test_experiment_load_sample_product_config() -> Result<(), Box<dyn Error>> {
-        let contents = fs::read_to_string("data/sample_product_config.yaml")?;
+        let contents = fs::read_to_string("data/zookeeper.product.config.yaml")?;
         let sample = YamlLoader::load_from_str(contents.as_str())?;
         println!("{:?}", sample);
         assert_eq!(1, sample.len());
@@ -202,7 +188,7 @@ mod experiments {
 
     #[test]
     fn test_experiment_load_sample_product_config_via_serde() -> Result<(), Box<dyn Error>> {
-        let contents = fs::read_to_string("data/sample_product_config.yaml")?;
+        let contents = fs::read_to_string("data/zookeeper.product.config.yaml")?;
         let product_config: ProductConfig = serde_yaml::from_str(&contents)?;
 
         println!("{:?}", product_config);
