@@ -24,7 +24,7 @@ impl ProductConfigManager {
         role: &str,
         version: &str,
         user_properties: &BTreeMap<String, Option<String>>,
-        overrides: Option<BtreeMap<String(Env, CLi, File), BTreeMAp<String, STring>>>,
+        overrides: Option<BTreeMap<String, BTreeMap<String, String>>>,
     ) -> ProductConfigResult<ProductConfiguration> {
         todo!()
     }

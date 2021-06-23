@@ -151,6 +151,7 @@ struct ProductVersion {
 /// Contains config files, env variables and cli commands / parameters.
 #[derive(Clone, Debug)]
 // TODO: find better name
+//    How to assign errors specific to properties and / or files / env / cli?
 pub struct ProductConfiguration {
     // Map<FileName, FileContent>
     pub files: BTreeMap<String, String>,

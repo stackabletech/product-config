@@ -1,7 +1,7 @@
 //! This module provides a serde [`serde::ser::Serializer`] to convert a (more or less)
-//! arbitrary struct into a [`HashMap`].
+//! arbitrary struct into a [`BTreeMap`].
 //!
-//! This can be used in products using this library to provide a strongly typed struct with all configuration parameters which can then be converted into a HashMap as required by this library.
+//! This can be used in products using this library to provide a strongly typed struct with all configuration parameters which can then be converted into a BTreeMap as required by this library.
 //!
 //! # Example
 //!
@@ -26,7 +26,7 @@
 //! ```
 use serde::de;
 use serde::ser::{self, Serialize};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::fmt::{self, Display};
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -60,7 +60,7 @@ impl Display for Error {
 
 impl std::error::Error for Error {}
 
-/// This method tries to convert any struct into a HashMap.
+/// This method tries to convert any struct into a BTreeMap.
 /// Other types (e.g. tuples, sequences etc.) are not supported
 ///
 /// NOTE: There will be edge-cases that this method does not support.
@@ -97,12 +97,12 @@ impl std::error::Error for Error {}
 ///
 /// These are not supported:
 /// * bytes
-pub fn to_hash_map<T>(value: &T) -> Result<HashMap<String, String>>
+pub fn to_hash_map<T>(value: &T) -> Result<BTreeMap<String, String>>
 where
     T: Serialize,
 {
     let mut serializer = Serializer {
-        output: HashMap::new(),
+        output: BTreeMap::new(),
         current_field: None,
         sequence: None,
         value: None,
@@ -115,7 +115,7 @@ where
 /// It is used to collect intermediate data while we walk the source object.
 // TODO: We need to detect when we're being called on something that is not a Map, Struct or Struct Variant
 struct Serializer {
-    output: HashMap<String, String>,
+    output: BTreeMap<String, String>,
 
     // This stores the current field name which includes all its parents.
     // The parents will be concatenated using dots (".", e.g. "foo.bar")
@@ -573,7 +573,7 @@ impl<'a> ser::SerializeStructVariant for &'a mut Serializer {
 mod tests {
     use super::to_hash_map;
     use serde::Serialize;
-    use std::collections::HashMap;
+    use std::collections::BTreeMap;
 
     #[test]
     fn test_struct() {
@@ -600,7 +600,7 @@ mod tests {
             Struct { a: u16, b: u32 },
         }
 
-        let mut test_map = HashMap::new();
+        let mut test_map = BTreeMap::new();
         test_map.insert("foo".to_string(), 123);
         test_map.insert("bar".to_string(), 456);
 
@@ -630,7 +630,7 @@ mod tests {
             opt_none_test: Option<String>,
             opt_some_test: Option<String>,
 
-            map_test: HashMap<String, i32>,
+            map_test: BTreeMap<String, i32>,
 
             enum_unit_variant_test: TestEnum,
             enum_newtype_variant_test: TestEnum,
