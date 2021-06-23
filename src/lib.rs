@@ -47,7 +47,7 @@ pub enum PropertyValidationResult {
     Warn(String, Error),
     /// On error, check the provided config and config values.
     /// Should never be used like this!
-    Error(Error),
+    Error(String, Error),
 }
 
 /// This is the main struct to hold all our knowledge about a certain product's configuration.
@@ -330,9 +330,12 @@ mod tests {
                 },
             },
         );
-        let error = PropertyValidationResult::Error(Error::ConfigSpecPropertiesNotFound {
-            name: "xyz".to_string(),
-        });
+        let error = PropertyValidationResult::Error(
+            "error".to_string(),
+            Error::ConfigSpecPropertiesNotFound {
+                name: "xyz".to_string(),
+            },
+        );
 
         assert!(valid > recommended);
         assert!(valid > default);
