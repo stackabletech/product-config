@@ -36,9 +36,12 @@ pub(crate) fn validate(
     // a missing / wrong property stops us from doing any other validation
     let property = match property_spec.get(&property_name) {
         None => {
-            return PropertyValidationResult::Error(Error::PropertyNotFound {
-                property_name: property_name.clone(),
-            });
+            return PropertyValidationResult::Error(
+                property_value.to_string(),
+                Error::PropertyNotFound {
+                    property_name: property_name.clone(),
+                },
+            );
         }
         Some(opt) => opt,
     };
@@ -51,7 +54,10 @@ pub(crate) fn validate(
     );
 
     if check_version.is_err() {
-        return PropertyValidationResult::Error(check_version.err().unwrap());
+        return PropertyValidationResult::Error(
+            property_value.to_string(),
+            check_version.err().unwrap(),
+        );
     }
 
     // for an empty value (""), ignore checks for the value (check_datatype, check_allowed_values..)
@@ -63,13 +69,19 @@ pub(crate) fn validate(
             &property.datatype,
         );
         if check_datatype.is_err() {
-            return PropertyValidationResult::Error(check_datatype.err().unwrap());
+            return PropertyValidationResult::Error(
+                property_value.to_string(),
+                check_datatype.err().unwrap(),
+            );
         }
 
         let check_allowed_values =
             check_allowed_values(&property_name, property_value, &property.allowed_values);
         if check_allowed_values.is_err() {
-            return PropertyValidationResult::Error(check_allowed_values.err().unwrap());
+            return PropertyValidationResult::Error(
+                property_value.to_string(),
+                check_allowed_values.err().unwrap(),
+            );
         }
     }
 
@@ -82,7 +94,7 @@ pub(crate) fn validate(
                     Error::PropertyDependencyUserValueNotRequired { .. } => {
                         PropertyValidationResult::Warn(property_value.to_string(), err)
                     }
-                    _ => PropertyValidationResult::Error(err),
+                    _ => PropertyValidationResult::Error(property_value.to_string(), err),
                 }
             }
         }
