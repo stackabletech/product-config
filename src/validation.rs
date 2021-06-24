@@ -1,8 +1,5 @@
 use crate::error::Error;
-use crate::types::{
-    Datatype, ProductConfigSpecProperties, PropertyName, PropertySpec, PropertyValueSpec, Role,
-    Unit,
-};
+use crate::types::{Datatype, PropertyName, PropertySpec, PropertyValueSpec, Role, Unit};
 use crate::util;
 use crate::util::semver_parse;
 use crate::PropertyValidationResult;
@@ -13,7 +10,7 @@ use std::fmt::Display;
 use std::str::FromStr;
 
 pub type ValidationResult<T> = Result<T, Error>;
-
+/*
 /// Returns the provided property_value if no validation errors appear
 ///
 /// # Arguments
@@ -135,6 +132,7 @@ pub(crate) fn validate(
 
     PropertyValidationResult::Valid(property_value.to_string())
 }
+
 
 /// Check if the provided property spec is correct. Checks include:
 /// - if default / recommended values match version, min / max, datatype, unit and regex
@@ -611,7 +609,6 @@ fn parse<T: FromStr>(property_name: &PropertyName, to_parse: &str) -> Result<T, 
         }
     }
 }
-/*
 #[cfg(test)]
 mod tests {
     macro_rules! hashmap {

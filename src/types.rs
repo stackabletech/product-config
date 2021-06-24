@@ -7,10 +7,30 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::{fmt, ops};
 
-/// Represents config spec like unit and regex specification
-#[derive(Clone, Debug)]
-pub struct ProductConfigSpecProperties {
-    pub units: HashMap<String, Regex>,
+#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialOrd, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ProductConfig {
+    version: String,
+    spec: Spec,
+    properties: Vec<PropertyDef>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialOrd, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct Spec {
+    units: Vec<UnitDef>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialOrd, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct UnitDef {
+    unit: Unit,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialOrd, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct PropertyDef {
+    property: PropertySpec,
 }
 
 /// Represents one property spec entry for a given property
@@ -191,32 +211,6 @@ pub struct Role {
     pub required: bool,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialOrd, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub struct Foo {
-    version: String,
-    spec: Spec,
-    properties: Vec<PropertyDef>,
-}
-
-#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialOrd, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub struct Spec {
-    units: Vec<UnitDef>,
-}
-
-#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialOrd, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub struct UnitDef {
-    unit: Unit,
-}
-
-#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialOrd, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub struct PropertyDef {
-    property: PropertySpec,
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
@@ -226,7 +220,7 @@ mod test {
     #[test]
     fn test_experiment_load_sample_product_config_via_serde() -> Result<(), Box<dyn Error>> {
         let contents = fs::read_to_string("data/test_product_config.yaml")?;
-        let product_config: Foo = serde_yaml::from_str(&contents)?;
+        let product_config: ProductConfig = serde_yaml::from_str(&contents)?;
 
         println!("{:?}", product_config);
         Ok(())

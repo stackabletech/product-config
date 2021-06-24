@@ -11,8 +11,18 @@
 //! - apply mode for config changes (e.g. restart)
 //! - additional information like web links or descriptions
 //!
+use std::collections::HashMap;
+use std::string::String;
+use std::{fs, str};
+
+use semver::Version;
+
+use crate::error::Error;
+use crate::types::{ProductConfig, PropertyName, PropertyNameKind, PropertySpec};
+use crate::util::semver_parse;
+use crate::validation::ValidationResult;
+
 pub mod error;
-pub mod reader;
 pub mod ser;
 pub mod types;
 pub mod writer;
@@ -20,16 +30,9 @@ pub mod writer;
 mod util;
 mod validation;
 
-use std::collections::HashMap;
-use std::str;
-use std::string::String;
-
-use crate::error::Error;
-use crate::reader::ConfigReader;
-use crate::types::{ProductConfigSpecProperties, PropertyName, PropertyNameKind, PropertySpec};
-use crate::util::semver_parse;
-use crate::validation::ValidationResult;
-use semver::Version;
+pub struct ProductConfigManager {
+    config: ProductConfig,
+}
 
 /// This will be returned for every validated configuration value (including user values
 /// and automatically added values from e.g. dependency, recommended etc.).
@@ -50,34 +53,26 @@ pub enum PropertyValidationResult {
     Error(String, Error),
 }
 
-/// This is the main struct to hold all our knowledge about a certain product's configuration.
-///
-/// A product configuration consists of a list of properties and their specification
-/// as well as some "configuration configuration". The latter describes some details about the configuration spec itself.
-#[derive(Clone, Debug)]
-pub struct ProductConfigSpec {
-    // provided config units with corresponding regex pattern
-    config_spec: ProductConfigSpecProperties,
-    // property names as key and the corresponding property spec as value
-    property_specs: HashMap<PropertyName, PropertySpec>,
-}
-
-impl ProductConfigSpec {
-    /// Create a ProductConfig based on a config reader like e.g. JSON, YAML etc.
+impl ProductConfigManager {
+    /// Create a ProductConfig from a YAML file.
     ///
     /// # Arguments
     ///
     /// * `config_reader` - config_reader implementation
     ///
-    pub fn new<CR: ConfigReader>(config_reader: CR) -> ValidationResult<Self> {
-        let product_config_spec = config_reader.read()?;
+    pub fn from_yaml_file(file_path: &str) -> ValidationResult<Self> {
+        let contents = fs::read_to_string(file_path).map_err(|_| error::Error::FileNotFound {
+            file_name: file_path.to_string(),
+        })?;
 
-        validation::validate_property_spec(
-            &product_config_spec.config_spec,
-            &product_config_spec.property_specs,
-        )?;
-
-        Ok(product_config_spec)
+        Ok(ProductConfigManager {
+            config: serde_yaml::from_str(&contents).map_err(|serde_error| {
+                error::Error::FileNotParsable {
+                    file_name: file_path.to_string(),
+                    reason: serde_error.to_string(),
+                }
+            })?,
+        })
     }
 
     /// Retrieve and check config properties depending on the kind (e.g. env, conf),
@@ -113,7 +108,7 @@ impl ProductConfigSpec {
     /// let env_sh = config.get(
     ///     "0.5.0",
     ///     &PropertyNameKind::File("env.sh".to_string()),
-    ///     Some("role_1"),
+    ///     "role_1",
     ///     &user_data,
     /// );
     /// ```
@@ -122,7 +117,7 @@ impl ProductConfigSpec {
         &self,
         version: &str,
         kind: &PropertyNameKind,
-        role: Option<&str>,
+        role: &str,
         user_config: &HashMap<String, String>,
     ) -> ValidationResult<HashMap<String, PropertyValidationResult>> {
         let mut result_config = HashMap::new();
@@ -131,7 +126,7 @@ impl ProductConfigSpec {
 
         // merge provided user properties with extracted property spec via role / kind and
         // dependencies to be validated later.
-        let merged_properties = self.merge_properties(user_config, &product_version, kind, role);
+        let merged_properties = self.merge_properties(&product_version, kind, role, user_config);
 
         for (name, value) in &merged_properties {
             let property_name = &PropertyName {
@@ -139,18 +134,18 @@ impl ProductConfigSpec {
                 kind: kind.clone(),
             };
 
-            result_config.insert(
-                property_name.name.clone(),
-                validation::validate(
-                    &self.property_specs,
-                    &self.config_spec,
-                    &merged_properties,
-                    &product_version,
-                    role,
-                    property_name,
-                    value,
-                ),
-            );
+            // result_config.insert(
+            //     property_name.name.clone(),
+            //     validation::validate(
+            //         &self.property_specs,
+            //         &self.config_spec,
+            //         &merged_properties,
+            //         &product_version,
+            //         role,
+            //         property_name,
+            //         value,
+            //     ),
+            // );
         }
 
         Ok(result_config)
@@ -161,52 +156,56 @@ impl ProductConfigSpec {
     ///
     /// # Arguments
     ///
-    /// * `user_config` - map with property name and values (the explicit user config properties)
     /// * `version` - the current product version
     /// * `kind` - property name kind provided by the user
     /// * `role` - property role provided by the user
+    /// * `user_config` - map with property name and values (the explicit user config properties)
     ///
     fn merge_properties(
         &self,
-        user_config: &HashMap<String, String>,
         version: &Version,
         kind: &PropertyNameKind,
-        role: Option<&str>,
+        role: &str,
+        user_config: &HashMap<String, String>,
     ) -> HashMap<String, String> {
+        // Vec<(PropertySpec, user_value / recommended / default)
         let mut merged_properties = HashMap::new();
-
-        if let Ok(properties) =
-            util::get_matching_properties(&self.property_specs, kind, role, version)
-        {
-            merged_properties.extend(properties)
-        }
-
-        if let Ok(dependencies) =
-            util::get_matching_dependencies(&self.property_specs, user_config, version, kind)
-        {
-            merged_properties.extend(dependencies);
-        }
-
-        merged_properties.extend(user_config.clone());
-
+        //
+        //     if let Ok(properties) =
+        //         util::get_matching_properties(&self.property_specs, kind, role, version)
+        //     {
+        //         merged_properties.extend(properties)
+        //     }
+        //
+        //     if let Ok(dependencies) =
+        //         util::get_matching_dependencies(&self.property_specs, user_config, version, kind)
+        //     {
+        //         merged_properties.extend(dependencies);
+        //     }
+        //
+        //     merged_properties.extend(user_config.clone());
+        //
         merged_properties
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::error::Error;
-    use crate::reader::ConfigJsonReader;
-    use crate::types::{PropertyName, PropertyNameKind};
-    use crate::{ProductConfigSpec, PropertyValidationResult};
-    use rstest::*;
     use std::collections::HashMap;
+
+    use rstest::*;
+
+    use crate::error::Error;
+    use crate::types::{PropertyName, PropertyNameKind};
+    use crate::util::semver_parse;
+    use crate::ProductConfigManager;
+    use crate::PropertyValidationResult;
 
     const ENV_INTEGER_PORT_MIN_MAX: &str = "ENV_INTEGER_PORT_MIN_MAX";
 
     const ENV_FLOAT: &str = "ENV_FLOAT";
     //const ENV_PROPERTY_STRING_MEMORY: &str = "ENV_PROPERTY_STRING_MEMORY";
-    //const ENV_PROPERTY_STRING_DEPRECATED: &str = "ENV_PROPERTY_STRING_DEPRECATED";
+    const ENV_PROPERTY_STRING_DEPRECATED: &str = "ENV_PROPERTY_STRING_DEPRECATED";
     //const ENV_ALLOWED_VALUES: &str = "ENV_ALLOWED_VALUES";
     //const ENV_SECURITY: &str = "ENV_SECURITY";
     //const ENV_SECURITY_PASSWORD: &str = "ENV_SECURITY_PASSWORD";
@@ -281,14 +280,14 @@ mod tests {
     #[case(
         VERSION_0_5_0,
         &PropertyNameKind::File(CONF_FILE.to_string()),
-        Some(ROLE_1),
+        ROLE_1,
         create_empty_data_and_expected().0,
         create_empty_data_and_expected().1,
     )]
     #[case(
       VERSION_0_5_0,
       &PropertyNameKind::File(CONF_FILE.to_string()),
-      Some(ROLE_1),
+      ROLE_1,
       create_correct_data_and_expected().0,
       create_correct_data_and_expected().1,
     )]
@@ -296,17 +295,14 @@ mod tests {
     fn test_get_kind_conf_role_1(
         #[case] version: &str,
         #[case] kind: &PropertyNameKind,
-        #[case] role: Option<&str>,
+        #[case] role: &str,
         #[case] user_data: HashMap<String, String>,
         #[case] expected: HashMap<String, PropertyValidationResult>,
     ) {
-        let config = ProductConfigSpec::new(ConfigJsonReader::new(
-            "data/test_config_spec.json",
-            "data/test_property_spec.json",
-        ))
-        .unwrap();
+        let manager =
+            ProductConfigManager::from_yaml_file("data/test_product_config.yaml").unwrap();
 
-        let result = config.get(version, kind, role, &user_data).unwrap();
+        let result = manager.get(version, kind, role, &user_data).unwrap();
 
         println!("Size: {}", result.len());
         for x in &result {
@@ -317,31 +313,37 @@ mod tests {
     }
 
     #[test]
-    fn test_product_config_result_order() {
-        let valid = PropertyValidationResult::Valid("valid".to_string());
-        let default = PropertyValidationResult::Default("default".to_string());
-        let recommended = PropertyValidationResult::RecommendedDefault("recommended".to_string());
-        let warn = PropertyValidationResult::Warn(
-            "warning".to_string(),
-            Error::PropertyNotFound {
-                property_name: PropertyName {
-                    name: "test".to_string(),
-                    kind: PropertyNameKind::File("my_config".to_string()),
-                },
-            },
-        );
-        let error = PropertyValidationResult::Error(
-            "error".to_string(),
-            Error::ConfigSpecPropertiesNotFound {
-                name: "xyz".to_string(),
-            },
+    fn test_product_config_manager_merge_user_and_config_properties() {
+        let manager =
+            ProductConfigManager::from_yaml_file("data/test_product_config.yaml").unwrap();
+
+        let mut user_config = HashMap::new();
+        user_config.insert(ENV_INTEGER_PORT_MIN_MAX.to_string(), "5000".to_string());
+        user_config.insert(ENV_FLOAT.to_string(), "5.888".to_string());
+        user_config.insert(ENV_SSL_CERTIFICATE_PATH.to_string(), "a/b/c".to_string());
+
+        let properties = manager.merge_properties(
+            &semver_parse(VERSION_0_5_0).unwrap(),
+            &PropertyNameKind::File("env.sh".to_string()),
+            ROLE_1,
+            &user_config,
         );
 
-        assert!(valid > recommended);
-        assert!(valid > default);
-        assert!(valid < error);
-
-        assert!(warn < error);
-        assert!(error > warn);
+        let mut expected = HashMap::new();
+        // vaild, expected
+        expected.insert(ENV_INTEGER_PORT_MIN_MAX.to_string(), "5000".to_string());
+        // valid, expected
+        expected.insert(ENV_FLOAT.to_string(), "5.888".to_string());
+        // expected
+        expected.insert(ENV_PROPERTY_STRING_DEPRECATED.to_string(), "".to_string());
+        //ENV_PROPERTY_STRING_DEPRECATED PropertyValidationResult::Error()
+        // required but no recommended or default value: expected
+        //ENV_SECURITY_PASSWORD PropertyValidationResult::Error()
+        // dependency of ENV_SECURITY_PASSWORD: not expected
+        //ENV_SECURITY true
+        // valid, expected
+        //ENV_SSL_CERTIFICATE_PATH "a/b/c"
+        // expected
+        //ENV_SSL_ENABLED "true"
     }
 }
