@@ -1,8 +1,11 @@
 use regex::Regex;
+use schemars::gen::SchemaGenerator;
+use schemars::schema::Schema;
 use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
+use serde::{de, Deserialize, Deserializer};
+use std::cmp::Ordering;
 use std::collections::HashMap;
-use std::fmt;
+use std::{fmt, ops};
 
 /// Represents config spec like unit and regex specification
 #[derive(Clone, Debug)]
@@ -68,9 +71,64 @@ impl PropertyNameKind {
 #[serde(rename_all = "camelCase")]
 pub struct Unit {
     pub name: String,
-    pub regex: String,
+    #[serde(deserialize_with = "regex_from_string")]
+    pub regex: StackableRegex,
     pub examples: Option<Vec<String>>,
     pub comment: Option<String>,
+}
+
+fn regex_from_string<'de, D>(deserializer: D) -> Result<StackableRegex, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    let r = Regex::new(&s).map_err(de::Error::custom)?;
+    Ok(StackableRegex {
+        expression: s,
+        compiled: r,
+    })
+}
+
+/// This is a workaround to deserialize a String directly into a compiled regex.
+/// Regex does not implement Eq, PartialOrd, PartialEq and JsonSchema.
+/// The field "compiled" should be hidden and only kept in memory. Never to be Serialized
+/// or explicitly Deserialized.
+// TODO: When moving to custom resources we need to properly implement JsonSchema
+//    e.g. map expression back to "regex" string
+#[derive(Clone, Debug)]
+pub struct StackableRegex {
+    pub expression: String,
+    compiled: Regex,
+}
+
+impl ops::Deref for StackableRegex {
+    type Target = regex::Regex;
+    fn deref(&self) -> &regex::Regex {
+        &self.compiled
+    }
+}
+
+impl Eq for StackableRegex {}
+impl PartialOrd for StackableRegex {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.expression.partial_cmp(&other.expression)
+    }
+}
+
+impl PartialEq for StackableRegex {
+    fn eq(&self, other: &Self) -> bool {
+        self.expression == other.expression
+    }
+}
+
+impl JsonSchema for StackableRegex {
+    fn schema_name() -> String {
+        todo!()
+    }
+
+    fn json_schema(_gen: &mut SchemaGenerator) -> Schema {
+        todo!()
+    }
 }
 
 /// Represents the default or recommended values a property may have: since default values

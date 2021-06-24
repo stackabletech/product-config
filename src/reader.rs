@@ -80,36 +80,36 @@ fn parse_json_config_spec(
 ) -> Result<ProductConfigSpec, Error> {
     // pack unit name and compiled regex pattern into map
     let mut config_spec_units = HashMap::new();
-    for unit in &config_spec.units {
-        let unit_name = if unit.name.is_empty() {
-            return Err(Error::ConfigSpecPropertiesNotFound {
-                name: "unit".to_string(),
-            });
-        } else {
-            unit.name.clone()
-        };
-
-        // no regex or empty regex provided
-        let unit_regex = if unit.regex == "".to_string() {
-            return Err(Error::EmptyRegexPattern {
-                unit: unit.name.clone(),
-            });
-        } else {
-            unit.regex.clone()
-        };
-
-        let regex = match Regex::new(unit_regex.as_str()) {
-            Ok(regex) => regex,
-            Err(_) => {
-                return Err(Error::InvalidRegexPattern {
-                    unit: unit_name,
-                    regex: unit_regex,
-                });
-            }
-        };
-
-        config_spec_units.insert(unit_name, regex);
-    }
+    // for unit in &config_spec.units {
+    //     let unit_name = if unit.name.is_empty() {
+    //         return Err(Error::ConfigSpecPropertiesNotFound {
+    //             name: "unit".to_string(),
+    //         });
+    //     } else {
+    //         unit.name.clone()
+    //     };
+    //
+    //     // no regex or empty regex provided
+    //     let unit_regex = if unit.regex == "".to_string() {
+    //         return Err(Error::EmptyRegexPattern {
+    //             unit: unit.name.clone(),
+    //         });
+    //     } else {
+    //         unit.regex.clone()
+    //     };
+    //
+    //     let regex = match Regex::new(unit_regex.as_str()) {
+    //         Ok(regex) => regex,
+    //         Err(_) => {
+    //             return Err(Error::InvalidRegexPattern {
+    //                 unit: unit_name,
+    //                 regex: unit_regex,
+    //             });
+    //         }
+    //     };
+    //
+    //     config_spec_units.insert(unit_name, regex);
+    // }
 
     // pack properties via name into hashmap for easier access
     let mut parsed_property_spec = HashMap::new();
