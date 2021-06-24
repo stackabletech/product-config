@@ -1,6 +1,7 @@
 use crate::error::Error;
 use crate::types::{
     Datatype, ProductConfigSpecProperties, PropertyName, PropertySpec, PropertyValueSpec, Role,
+    Unit,
 };
 use crate::util;
 use crate::util::semver_parse;
@@ -513,34 +514,20 @@ fn check_datatype_string(
     property_value: &str,
     min: &Option<String>,
     max: &Option<String>,
-    unit: &Option<String>,
+    unit: &Option<Unit>,
 ) -> ValidationResult<()> {
     let len: usize = property_value.len();
     check_bound::<usize>(property_name, len, min, min_bound)?;
     check_bound::<usize>(property_name, len, max, max_bound)?;
 
-    if let Some(unit_name) = unit {
-        match config_spec_units.get(unit_name.as_str()) {
-            None => {
-                return Err(Error::UnitSettingNotFound {
-                    property_name: property_name.clone(),
-                    unit: unit_name.clone(),
-                })
-            }
-            Some(regex) => {
-                if !regex.is_match(property_value) {
-                    return Err(Error::DatatypeRegexNotMatching {
-                        property_name: property_name.clone(),
-                        value: property_value.to_string(),
-                    });
-                }
-            }
-        }
-    } else {
-        return Err(Error::UnitNotProvided {
-            property_name: property_name.clone(),
-        });
-    }
+    // if let Some(unit) = unit {
+    //     if !unit.regex.is_match(property_value) {
+    //         return Err(Error::DatatypeRegexNotMatching {
+    //             property_name: property_name.clone(),
+    //             value: property_value.to_string(),
+    //         });
+    //     }
+    // }
 
     Ok(())
 }
@@ -624,7 +611,7 @@ fn parse<T: FromStr>(property_name: &PropertyName, to_parse: &str) -> Result<T, 
         }
     }
 }
-
+/*
 #[cfg(test)]
 mod tests {
     macro_rules! hashmap {
@@ -902,3 +889,4 @@ mod tests {
         assert_eq!(result, expected)
     }
 }
+*/

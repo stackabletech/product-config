@@ -1,5 +1,6 @@
 use regex::Regex;
-use serde::Deserialize;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
 
@@ -10,7 +11,8 @@ pub(crate) struct ProductConfigSpecProperties {
 }
 
 /// Represents one property spec entry for a given property
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialOrd, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct PropertySpec {
     pub property_names: Vec<PropertyName>,
     pub datatype: Datatype,
@@ -30,7 +32,8 @@ pub(crate) struct PropertySpec {
 }
 
 /// Represents (one of multiple) unique identifier for a property name depending on the type
-#[derive(Deserialize, Clone, Debug, Hash, Eq, PartialOrd, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, Hash, JsonSchema, PartialOrd, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct PropertyName {
     pub name: String,
     pub kind: PropertyNameKind,
@@ -43,8 +46,8 @@ impl fmt::Display for PropertyName {
 }
 
 /// Represents different config identifier types like config file, environment variable, command line parameter etc.
-#[derive(Deserialize, Clone, Debug, Hash, Eq, PartialOrd, PartialEq)]
-#[serde(tag = "type", content = "file", rename_all = "lowercase")]
+#[derive(Clone, Debug, Deserialize, Eq, Hash, JsonSchema, PartialOrd, PartialEq)]
+#[serde(tag = "type", content = "file", rename_all = "camelCase")]
 pub enum PropertyNameKind {
     File(String),
     Env,
@@ -61,17 +64,19 @@ impl PropertyNameKind {
 }
 
 /// Represents the config unit (name corresponds to the unit type like password and a given regex)
-#[derive(Deserialize, Debug)]
+#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialOrd, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct Unit {
     pub name: String,
-    pub regex: Option<String>,
+    pub regex: String,
     pub examples: Option<Vec<String>>,
     pub comment: Option<String>,
 }
 
 /// Represents the default or recommended values a property may have: since default values
 /// may change with different releases, optional from and to version parameters can be provided
-#[derive(Deserialize, Clone, Debug, Eq, PartialOrd, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialOrd, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct PropertyValueSpec {
     pub from_version: Option<String>,
     pub to_version: Option<String>,
@@ -79,33 +84,33 @@ pub struct PropertyValueSpec {
 }
 
 /// Represents all supported data types
-#[derive(Deserialize, Clone, Debug, Eq, PartialOrd, PartialEq)]
-#[serde(rename_all = "lowercase", tag = "type")]
+#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialOrd, PartialEq)]
+#[serde(rename_all = "camelCase", tag = "type")]
 pub(crate) enum Datatype {
     Bool,
     Integer {
         min: Option<String>,
         max: Option<String>,
-        unit: Option<String>,
+        unit: Option<Unit>,
         accepted_units: Option<Vec<String>>,
         default_unit: Option<String>,
     },
     Float {
         min: Option<String>,
         max: Option<String>,
-        unit: Option<String>,
+        unit: Option<Unit>,
         accepted_units: Option<Vec<String>>,
         default_unit: Option<String>,
     },
     String {
         min: Option<String>,
         max: Option<String>,
-        unit: Option<String>,
+        unit: Option<Unit>,
         accepted_units: Option<Vec<String>>,
         default_unit: Option<String>,
     },
     Array {
-        unit: Option<String>,
+        unit: Option<Unit>,
         accepted_units: Option<Vec<String>>,
         default_unit: Option<String>,
     },
@@ -113,15 +118,59 @@ pub(crate) enum Datatype {
 
 /// Represents a dependency on another config property and (if available) a required value
 /// e.g. to set ssl certificates one has to set some property use_ssl to true
-#[derive(Deserialize, Clone, Debug, Eq, PartialOrd, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialOrd, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct PropertyDependency {
     pub property_names: Vec<PropertyName>,
     pub value: Option<String>,
 }
 
 /// Represents a role in the cluster, e.g. Server / Client and if the property is required
-#[derive(Deserialize, Clone, Debug, Eq, PartialOrd, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialOrd, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct Role {
     pub name: String,
     pub required: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialOrd, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct Foo {
+    version: String,
+    spec: Spec,
+    properties: Vec<PropertyDef>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialOrd, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct Spec {
+    units: Vec<UnitDef>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialOrd, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct UnitDef {
+    unit: Unit,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialOrd, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct PropertyDef {
+    property: PropertySpec,
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use std::error::Error;
+    use std::fs;
+
+    #[test]
+    fn test_experiment_load_sample_product_config_via_serde() -> Result<(), Box<dyn Error>> {
+        let contents = fs::read_to_string("data/test_product_config.yaml")?;
+        let product_config: Foo = serde_yaml::from_str(&contents)?;
+
+        println!("{:?}", product_config);
+        Ok(())
+    }
 }

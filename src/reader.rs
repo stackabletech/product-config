@@ -90,12 +90,12 @@ fn parse_json_config_spec(
         };
 
         // no regex or empty regex provided
-        let unit_regex = if unit.regex.is_none() || unit.regex == Some("".to_string()) {
+        let unit_regex = if unit.regex == "".to_string() {
             return Err(Error::EmptyRegexPattern {
                 unit: unit.name.clone(),
             });
         } else {
-            unit.regex.clone().unwrap()
+            unit.regex.clone()
         };
 
         let regex = match Regex::new(unit_regex.as_str()) {
