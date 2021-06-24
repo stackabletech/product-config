@@ -6,14 +6,14 @@ use std::fmt;
 
 /// Represents config spec like unit and regex specification
 #[derive(Clone, Debug)]
-pub(crate) struct ProductConfigSpecProperties {
+pub struct ProductConfigSpecProperties {
     pub units: HashMap<String, Regex>,
 }
 
 /// Represents one property spec entry for a given property
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialOrd, PartialEq)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct PropertySpec {
+pub struct PropertySpec {
     pub property_names: Vec<PropertyName>,
     pub datatype: Datatype,
     pub default_values: Option<Vec<PropertyValueSpec>>,
@@ -66,7 +66,7 @@ impl PropertyNameKind {
 /// Represents the config unit (name corresponds to the unit type like password and a given regex)
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialOrd, PartialEq)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct Unit {
+pub struct Unit {
     pub name: String,
     pub regex: String,
     pub examples: Option<Vec<String>>,
@@ -86,7 +86,7 @@ pub struct PropertyValueSpec {
 /// Represents all supported data types
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialOrd, PartialEq)]
 #[serde(rename_all = "camelCase", tag = "type")]
-pub(crate) enum Datatype {
+pub enum Datatype {
     Bool,
     Integer {
         min: Option<String>,
@@ -121,7 +121,7 @@ pub(crate) enum Datatype {
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialOrd, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct PropertyDependency {
-    pub property_names: Vec<PropertyName>,
+    pub property: PropertySpec,
     pub value: Option<String>,
 }
 

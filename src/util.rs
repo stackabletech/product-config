@@ -129,34 +129,34 @@ fn get_config_dependencies_and_values(
     property_dependencies: &[PropertyDependency],
 ) -> ValidationResult<HashMap<String, String>> {
     let mut dependencies = HashMap::new();
-    for property_dependency in property_dependencies {
-        for property_dependency_name in &property_dependency.property_names {
-            // the dependency should not differ in the kind
-            if property_name.kind == property_dependency_name.kind {
-                // if the dependency has a proposed value we are done
-                if let Some(dependency_value) = &property_dependency.value {
-                    dependencies.insert(
-                        property_dependency_name.name.clone(),
-                        dependency_value.clone(),
-                    );
-                }
-                // we check the dependency for a recommended value
-                if let Some(dependency_property) = property_spec.get(property_dependency_name) {
-                    if let Some(recommended) = &dependency_property.recommended_values {
-                        let recommended_value = get_property_value_for_version(
-                            property_name,
-                            recommended,
-                            product_version,
-                        )?;
-                        dependencies.insert(
-                            property_dependency_name.name.clone(),
-                            recommended_value.value,
-                        );
-                    }
-                }
-            }
-        }
-    }
+    // for property_dependency in property_dependencies {
+    //     for property_dependency_name in &property_dependency.property_names {
+    //         // the dependency should not differ in the kind
+    //         if property_name.kind == property_dependency_name.kind {
+    //             // if the dependency has a proposed value we are done
+    //             if let Some(dependency_value) = &property_dependency.value {
+    //                 dependencies.insert(
+    //                     property_dependency_name.name.clone(),
+    //                     dependency_value.clone(),
+    //                 );
+    //             }
+    //             // we check the dependency for a recommended value
+    //             if let Some(dependency_property) = property_spec.get(property_dependency_name) {
+    //                 if let Some(recommended) = &dependency_property.recommended_values {
+    //                     let recommended_value = get_property_value_for_version(
+    //                         property_name,
+    //                         recommended,
+    //                         product_version,
+    //                     )?;
+    //                     dependencies.insert(
+    //                         property_dependency_name.name.clone(),
+    //                         recommended_value.value,
+    //                     );
+    //                 }
+    //             }
+    //         }
+    //     }
+    //}
 
     Ok(dependencies)
 }

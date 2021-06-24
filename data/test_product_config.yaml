@@ -51,7 +51,7 @@ spec:
         regex: "^-?[0-9][0-9,\\.]+$"
 
 properties:
-  - property:
+  - property: &integerPortMinMax
       propertyNames:
         - name: "ENV_INTEGER_PORT_MIN_MAX"
           kind:
@@ -81,7 +81,7 @@ properties:
         - name: "role_2"
           required: false
       asOfVersion: "0.5.0"
-  - property:
+  - property: &float
       propertyNames:
         - name: "ENV_FLOAT"
           kind:
@@ -110,7 +110,7 @@ properties:
         - name: "role_2"
           required: false
       asOfVersion: "0.5.0"
-  - property:
+  - property: &propertyStringMemory
       propertyNames:
         - name: "ENV_PROPERTY_STRING_MEMORY"
           kind:
@@ -139,7 +139,7 @@ properties:
         - name: "role_1"
           required: false
       asOfVersion: "0.5.0"
-  - property:
+  - property: &propertyStringDeprecated
       propertyNames:
         - name: "ENV_PROPERTY_STRING_DEPRECATED"
           kind:
@@ -159,7 +159,7 @@ properties:
           required: false
       asOfVersion: "0.1.0"
       deprecatedSince: "0.4.0"
-  - property:
+  - property: &allowedValues
       propertyNames:
         - name: "ENV_allowedValues"
           kind:
@@ -185,7 +185,7 @@ properties:
         - "allowed_value2"
         - "allowed_value3"
       asOfVersion: "0.1.0"
-  - property:
+  - property: &security
       propertyNames:
         - name: "ENV_SECURITY"
           kind:
@@ -210,7 +210,7 @@ properties:
           required: true
       asOfVersion: "0.5.0"
       restartRequired: true
-  - property:
+  - property: &securityPassword
       propertyNames:
         - name: "ENV_SECURITY_PASSWORD"
           kind:
@@ -230,18 +230,10 @@ properties:
           required: true
       asOfVersion: "0.5.0"
       dependsOn:
-        - propertyNames:
-            - name: "ENV_SECURITY"
-              kind:
-                type: "file"
-                file: "env.sh"
-            - name: "conf.security"
-              kind:
-                type: "file"
-                file: "my.config"
+        - property: *security
           value: "true"
       restartRequired: true
-  - property:
+  - property: &sslEnabled
       propertyNames:
         - name: "ENV_SSL_ENABLED"
           kind:
@@ -265,7 +257,7 @@ properties:
         - name: "role_2"
           required: false
       asOfVersion: "0.5.0"
-  - property:
+  - property: &sslCertificatePath
       propertyNames:
         - name: "ENV_SSL_CERTIFICATE_PATH"
           kind:
@@ -285,13 +277,5 @@ properties:
         unit: *unitDirectory
       asOfVersion: "0.5.0"
       dependsOn:
-        - propertyNames:
-            - name: "ENV_SSL_ENABLED"
-              kind:
-                type: "file"
-                file: "env.sh"
-            - name: "conf.ssl.enabled"
-              kind:
-                type: "file"
-                file: "my.config"
+        - property: *sslEnabled
           value: "true"

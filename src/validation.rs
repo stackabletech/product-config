@@ -179,34 +179,34 @@ pub(crate) fn validate_property_spec(
             }
         }
 
-        // prepare "user" data
-        let mut user_data = HashMap::new();
-        if let Some(dependencies) = &spec.depends_on {
-            for dependency in dependencies {
-                for dep_name in &dependency.property_names {
-                    if let Some(dependency_property) = property_spec.get(dep_name) {
-                        if let Some(dependency_property_recommended) =
-                            &dependency_property.recommended_values
-                        {
-                            let filtered_value = util::get_property_value_for_version(
-                                &dep_name,
-                                dependency_property_recommended,
-                                &as_of_version,
-                            )?;
-
-                            user_data.insert(dep_name.name.clone(), filtered_value.value.clone());
-                        }
-                    } else {
-                        return Err(Error::PropertyDependencyMissing {
-                            property_name: name.clone(),
-                            dependency: dependency.property_names.clone(),
-                        });
-                    }
-                }
-            }
-        }
+        // // prepare "user" data
+        // let mut user_data = HashMap::new();
+        // if let Some(dependencies) = &spec.depends_on {
+        //     for dependency in dependencies {
+        //         for dep_name in &dependency.property_names {
+        //             if let Some(dependency_property) = property_spec.get(dep_name) {
+        //                 if let Some(dependency_property_recommended) =
+        //                     &dependency_property.recommended_values
+        //                 {
+        //                     let filtered_value = util::get_property_value_for_version(
+        //                         &dep_name,
+        //                         dependency_property_recommended,
+        //                         &as_of_version,
+        //                     )?;
+        //
+        //                     user_data.insert(dep_name.name.clone(), filtered_value.value.clone());
+        //                 }
+        //             } else {
+        //                 return Err(Error::PropertyDependencyMissing {
+        //                     property_name: name.clone(),
+        //                     dependency: dependency.property_names.clone(),
+        //                 });
+        //             }
+        //         }
+        //     }
+        // }
         // 3) check if dependency values are available and the recommended value matches the required one
-        check_dependencies(name, spec, &user_data)?;
+        //check_dependencies(name, spec, &user_data)?;
 
         // 4) check if role available
         if spec.roles.is_none() {
@@ -344,61 +344,61 @@ fn check_dependencies(
     };
 
     // for each dependency, check if user_properties contain the property and the correct value
-    for property_dependency in property_dependencies {
-        // check if we find any matches, otherwise return error after the loop
-        let mut found_match = false;
-        // for each property name provided within the dependency
-        for dependency_property_name in &property_dependency.property_names {
-            if !user_properties.contains_key(&dependency_property_name.name) {
-                continue;
-            }
+    // for property_dependency in property_dependencies {
+    //     // check if we find any matches, otherwise return error after the loop
+    //     let mut found_match = false;
+    //     // for each property name provided within the dependency
+    //     for dependency_property_name in &property_dependency.property_names {
+    //         if !user_properties.contains_key(&dependency_property_name.name) {
+    //             continue;
+    //         }
+    //
+    //         found_match = true;
+    //
+    //         match (
+    //             user_properties.get(&dependency_property_name.name),
+    //             &property_dependency.value,
+    //         ) {
+    //             // no user value, no property value -> ok
+    //             (None, None) => continue,
+    //             // no user value but property value required -> error
+    //             (None, Some(config_value)) => {
+    //                 return Err(Error::PropertyDependencyUserValueMissing {
+    //                     property_name: property_name.clone(),
+    //                     dependency: dependency_property_name.name.clone(),
+    //                     required_value: config_value.clone(),
+    //                 })
+    //             }
+    //             // user value but no property value required -> error
+    //             (Some(user_value), None) => {
+    //                 return Err(Error::PropertyDependencyUserValueNotRequired {
+    //                     property_name: property_name.clone(),
+    //                     dependency: dependency_property_name.name.clone(),
+    //                     user_value: user_value.clone(),
+    //                 })
+    //             }
+    //             // both values available -> check if match
+    //             (Some(user_value), Some(config_value)) => {
+    //                 if user_value != config_value {
+    //                     return Err(Error::PropertyDependencyValueInvalid {
+    //                         property_name: property_name.clone(),
+    //                         dependency: dependency_property_name.name.clone(),
+    //                         user_value: user_value.clone(),
+    //                         required_value: config_value.clone(),
+    //                     });
+    //                 }
+    //             }
+    //         }
+    //     }
 
-            found_match = true;
-
-            match (
-                user_properties.get(&dependency_property_name.name),
-                &property_dependency.value,
-            ) {
-                // no user value, no property value -> ok
-                (None, None) => continue,
-                // no user value but property value required -> error
-                (None, Some(config_value)) => {
-                    return Err(Error::PropertyDependencyUserValueMissing {
-                        property_name: property_name.clone(),
-                        dependency: dependency_property_name.name.clone(),
-                        required_value: config_value.clone(),
-                    })
-                }
-                // user value but no property value required -> error
-                (Some(user_value), None) => {
-                    return Err(Error::PropertyDependencyUserValueNotRequired {
-                        property_name: property_name.clone(),
-                        dependency: dependency_property_name.name.clone(),
-                        user_value: user_value.clone(),
-                    })
-                }
-                // both values available -> check if match
-                (Some(user_value), Some(config_value)) => {
-                    if user_value != config_value {
-                        return Err(Error::PropertyDependencyValueInvalid {
-                            property_name: property_name.clone(),
-                            dependency: dependency_property_name.name.clone(),
-                            user_value: user_value.clone(),
-                            required_value: config_value.clone(),
-                        });
-                    }
-                }
-            }
-        }
-
-        if !found_match {
-            // TODO: Error or just add the correct dependency?
-            return Err(Error::PropertyDependencyMissing {
-                property_name: property_name.clone(),
-                dependency: property_dependency.property_names.clone(),
-            });
-        }
-    }
+    //     if !found_match {
+    //         // TODO: Error or just add the correct dependency?
+    //         return Err(Error::PropertyDependencyMissing {
+    //             property_name: property_name.clone(),
+    //             dependency: property_dependency.property_names.clone(),
+    //         });
+    //     }
+    // }
 
     Ok(())
 }
