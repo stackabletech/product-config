@@ -1,36 +1,50 @@
+use crate::util::{get_property_value_for_version, semver_parse};
+use crate::validation::ValidationResult;
 use regex::Regex;
 use schemars::gen::SchemaGenerator;
 use schemars::schema::Schema;
 use schemars::JsonSchema;
+use semver::Version;
 use serde::{de, Deserialize, Deserializer};
 use std::cmp::Ordering;
 use std::collections::HashMap;
+use std::iter::FromIterator;
+use std::ops::Deref;
 use std::{fmt, ops};
 
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialOrd, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ProductConfig {
-    version: String,
-    spec: Spec,
-    properties: Vec<PropertyDef>,
+    pub version: String,
+    pub spec: Spec,
+    pub properties: Vec<PropertyAnchor>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialOrd, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Spec {
-    units: Vec<UnitDef>,
+    units: Vec<UnitAnchor>,
 }
 
+/// This is a workaround to use yaml anchors with serde
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialOrd, PartialEq)]
 #[serde(rename_all = "camelCase")]
-pub struct UnitDef {
-    unit: Unit,
+pub struct UnitAnchor {
+    pub unit: Unit,
 }
 
+/// This is a workaround to use yaml anchors with serde
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialOrd, PartialEq)]
 #[serde(rename_all = "camelCase")]
-pub struct PropertyDef {
-    property: PropertySpec,
+pub struct PropertyAnchor {
+    pub property: PropertySpec,
+}
+
+impl ops::Deref for PropertyAnchor {
+    type Target = PropertySpec;
+    fn deref(&self) -> &PropertySpec {
+        &self.property
+    }
 }
 
 /// Represents one property spec entry for a given property
@@ -39,19 +53,111 @@ pub struct PropertyDef {
 pub struct PropertySpec {
     pub property_names: Vec<PropertyName>,
     pub datatype: Datatype,
+    pub as_of_version: String,
     pub default_values: Option<Vec<PropertyValueSpec>>,
     pub recommended_values: Option<Vec<PropertyValueSpec>>,
     pub allowed_values: Option<Vec<String>>,
-    pub as_of_version: String,
     pub deprecated_since: Option<String>,
     pub deprecated_for: Option<Vec<String>>,
-    pub depends_on: Option<Vec<PropertyDependency>>,
+    pub expands_to: Option<Vec<PropertyDependency>>,
     pub roles: Option<Vec<Role>>,
     pub restart_required: Option<bool>,
     pub tags: Option<Vec<String>>,
     pub additional_doc: Option<Vec<String>>,
     pub comment: Option<String>,
     pub description: Option<String>,
+}
+
+impl PropertySpec {
+    pub fn recommended_or_default(
+        &self,
+        version: &Version,
+        kind: &PropertyNameKind,
+    ) -> Option<(String, Option<String>)> {
+        if let Some(name) = self.name_from_kind(kind) {
+            if let Some(recommended_vals) = &self.recommended_values {
+                let val = self.filter_value(version, recommended_vals);
+                return Some((name, val));
+            } else if let Some(default_vals) = &self.default_values {
+                let val = self.filter_value(version, default_vals);
+                return Some((name, val));
+            }
+        }
+        None
+    }
+
+    fn filter_value(&self, version: &Version, values: &[PropertyValueSpec]) -> Option<String> {
+        for value in values {
+            if let Some(from) = &value.from_version {
+                let from_version = semver_parse(from).unwrap();
+
+                if from_version > *version {
+                    continue;
+                }
+            }
+
+            if let Some(to) = &value.to_version {
+                let to_version = semver_parse(to).unwrap();
+
+                if to_version < *version {
+                    continue;
+                }
+            }
+
+            return Some(value.value.clone());
+        }
+        None
+    }
+
+    pub fn name_from_kind(&self, kind: &PropertyNameKind) -> Option<String> {
+        for name in &self.property_names {
+            if name.kind == *kind {
+                return Some(name.name.to_string());
+            }
+        }
+        None
+    }
+
+    pub fn has_role_required(&self, user_role: &str) -> bool {
+        if let Some(roles) = &self.roles {
+            for role in roles {
+                if role.name == user_role && role.required {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    pub fn has_role(&self, user_role: &str) -> bool {
+        if let Some(roles) = &self.roles {
+            for role in roles {
+                if role.name == user_role {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    pub fn is_version_supported(&self, product_version: &Version) -> ValidationResult<bool> {
+        Ok(semver_parse(&self.as_of_version)? <= *product_version)
+    }
+
+    pub fn is_version_deprecated(&self, product_version: &Version) -> ValidationResult<bool> {
+        if let Some(deprecated_since) = &self.deprecated_since {
+            return Ok(semver_parse(deprecated_since)? <= *product_version);
+        }
+        Ok(false)
+    }
+
+    pub fn property_name(&self, kind: &PropertyNameKind) -> Vec<String> {
+        Vec::from_iter(
+            self.property_names
+                .iter()
+                .map(|property| property.name.clone()),
+        )
+    }
 }
 
 /// Represents (one of multiple) unique identifier for a property name depending on the type
@@ -114,7 +220,7 @@ where
 /// The field "compiled" should be hidden and only kept in memory. Never to be Serialized
 /// or explicitly Deserialized.
 // TODO: When moving to custom resources we need to properly implement JsonSchema
-//    e.g. map expression back to "regex" string
+//    e.g. map expression back to "regex" field string
 #[derive(Clone, Debug)]
 pub struct StackableRegex {
     pub expression: String,
@@ -145,7 +251,6 @@ impl JsonSchema for StackableRegex {
     fn schema_name() -> String {
         todo!()
     }
-
     fn json_schema(_gen: &mut SchemaGenerator) -> Schema {
         todo!()
     }

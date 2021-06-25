@@ -15,62 +15,61 @@ use std::collections::HashMap;
 /// # Arguments
 ///
 /// * `property_spec` - map with property name as key and the corresponding property spec as value
-/// * `kind` - property name kind provided by the user
 /// * `role` - the role required / used for the property
+/// * `kind` - property name kind provided by the user
 /// * `product_version` - the provided product version
-///
 pub(crate) fn get_matching_properties(
     property_spec: &HashMap<PropertyName, PropertySpec>,
+    role: &str,
     kind: &PropertyNameKind,
-    role: Option<&str>,
     product_version: &Version,
 ) -> ValidationResult<HashMap<String, String>> {
     let mut properties = HashMap::new();
 
-    for (property_name, spec) in property_spec {
-        // ignore this property if kind does not match
-        // TODO: improve performance by sorting properties via kind
-        if &property_name.kind != kind {
-            continue;
-        }
-
-        // Ignore this configuration property if it is only available (specified via `as_of_version`)
-        // in later versions than the one we're checking against.
-        if semver_parse(spec.as_of_version.as_str())? > *product_version {
-            continue;
-        }
-
-        // ignore completely if role is None
-        // ignore this property if role does not match or is not required
-        if let Some(property_roles) = &spec.roles {
-            for property_role in property_roles {
-                // role found?
-                if Some(property_role.name.as_str()) == role && property_role.required {
-                    // check for recommended value and matching version
-                    if let Some(recommended) = &spec.recommended_values {
-                        let property_value = get_property_value_for_version(
-                            property_name,
-                            recommended,
-                            product_version,
-                        )?;
-
-                        properties.insert(property_name.name.clone(), property_value.value);
-
-                        if let Some(property_dependencies) = &spec.depends_on {
-                            let dependencies = get_config_dependencies_and_values(
-                                property_spec,
-                                product_version,
-                                property_name,
-                                &property_dependencies,
-                            )?;
-
-                            properties.extend(dependencies);
-                        }
-                    }
-                }
-            }
-        }
-    }
+    // for (property_name, spec) in property_spec {
+    //     // ignore this property if kind does not match
+    //     // TODO: improve performance by sorting properties via kind
+    //     if &property_name.kind != kind {
+    //         continue;
+    //     }
+    //
+    //     // Ignore this configuration property if it is only available (specified via `as_of_version`)
+    //     // in later versions than the one we're checking against.
+    //     if semver_parse(spec.as_of_version.as_str())? > *product_version {
+    //         continue;
+    //     }
+    //
+    //     // ignore completely if role is None
+    //     // ignore this property if role does not match or is not required
+    //     if let Some(property_roles) = &spec.roles {
+    //         for property_role in property_roles {
+    //             // role found?
+    //             if Some(property_role.name.as_str()) == role && property_role.required {
+    //                 // check for recommended value and matching version
+    //                 if let Some(recommended) = &spec.recommended_values {
+    //                     let property_value = get_property_value_for_version(
+    //                         property_name,
+    //                         recommended,
+    //                         product_version,
+    //                     )?;
+    //
+    //                     properties.insert(property_name.name.clone(), property_value.value);
+    //
+    //                     if let Some(property_dependencies) = &spec.depends_on {
+    //                         let dependencies = get_config_dependencies_and_values(
+    //                             property_spec,
+    //                             product_version,
+    //                             property_name,
+    //                             &property_dependencies,
+    //                         )?;
+    //
+    //                         properties.extend(dependencies);
+    //                     }
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 
     Ok(properties)
 }
@@ -79,16 +78,16 @@ pub(crate) fn get_matching_properties(
 ///
 /// # Arguments
 ///
-/// * `property_spec` - map with property name as key and the corresponding property spec as value
-/// * `user_config` - map with the user config names and according values
 /// * `version` - the provided product version
 /// * `kind` - property name kind provided by the user
+/// * `property_spec` - map with property name as key and the corresponding property spec as value
+/// * `user_config` - map with the user config names and according values
 ///
 pub(crate) fn get_matching_dependencies(
-    property_spec: &HashMap<PropertyName, PropertySpec>,
-    user_config: &HashMap<String, String>,
     version: &Version,
     kind: &PropertyNameKind,
+    property_spec: &HashMap<PropertyName, PropertySpec>,
+    user_config: &HashMap<String, String>,
 ) -> ValidationResult<HashMap<String, String>> {
     let mut user_dependencies = HashMap::new();
     for name in user_config.keys() {
@@ -98,7 +97,7 @@ pub(crate) fn get_matching_dependencies(
         };
 
         if let Some(property) = property_spec.get(&property_name) {
-            if let Some(dependencies) = &property.depends_on {
+            if let Some(dependencies) = &property.expands_to {
                 user_dependencies.extend(get_config_dependencies_and_values(
                     property_spec,
                     version,

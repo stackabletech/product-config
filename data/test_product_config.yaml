@@ -185,54 +185,6 @@ properties:
         - "allowed_value2"
         - "allowed_value3"
       asOfVersion: "0.1.0"
-  - property: &security
-      propertyNames:
-        - name: "ENV_SECURITY"
-          kind:
-            type: "file"
-            file: "env.sh"
-        - name: "conf.security"
-          kind:
-            type: "file"
-            file: "my.config"
-      datatype:
-        type: "bool"
-      defaultValues:
-        - fromVersion: "0.5.0"
-          value: "false"
-      recommendedValues:
-        - fromVersion: "0.5.0"
-          value: "true"
-      roles:
-        - name: "role_1"
-          required: false
-        - name: "role_2"
-          required: true
-      asOfVersion: "0.5.0"
-      restartRequired: true
-  - property: &securityPassword
-      propertyNames:
-        - name: "ENV_SECURITY_PASSWORD"
-          kind:
-            type: "file"
-            file: "env.sh"
-        - name: "conf.security.password"
-          kind:
-            type: "file"
-            file: "my.config"
-      datatype:
-        type: "string"
-        unit: *unitPassword
-      roles:
-        - name: "role_1"
-          required: true
-        - name: "role_2"
-          required: true
-      asOfVersion: "0.5.0"
-      dependsOn:
-        - property: *security
-          value: "true"
-      restartRequired: true
   - property: &sslEnabled
       propertyNames:
         - name: "ENV_SSL_ENABLED"
@@ -254,8 +206,6 @@ properties:
       roles:
         - name: "role_1"
           required: false
-        - name: "role_2"
-          required: false
       asOfVersion: "0.5.0"
   - property: &sslCertificatePath
       propertyNames:
@@ -267,15 +217,33 @@ properties:
           kind:
             type: "file"
             file: "my.config"
+      defaultValues:
+        - fromVersion: "0.5.0"
+          value: "path/to/certificates"
       roles:
         - name: "role_1"
-          required: true
-        - name: "role_2"
           required: false
       datatype:
         type: "string"
         unit: *unitDirectory
       asOfVersion: "0.5.0"
-      dependsOn:
+  - property: &enableSecurity
+      propertyNames:
+        - name: "ENV_ENABLE_SECURITY"
+          kind:
+            type: "file"
+            file: "env.sh"
+        - name: "conf.enable.security"
+          kind:
+            type: "file"
+            file: "my.config"
+      roles:
+        - name: "role_1"
+          required: true
+      datatype:
+        type: "bool"
+      asOfVersion: "0.5.0"
+      expandsTo:
         - property: *sslEnabled
           value: "true"
+        - property: *sslCertificatePath

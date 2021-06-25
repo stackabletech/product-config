@@ -11,7 +11,7 @@
 //! - apply mode for config changes (e.g. restart)
 //! - additional information like web links or descriptions
 //!
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::string::String;
 use std::{fs, str};
 
@@ -19,8 +19,9 @@ use semver::Version;
 
 use crate::error::Error;
 use crate::types::{ProductConfig, PropertyName, PropertyNameKind, PropertySpec};
-use crate::util::semver_parse;
+use crate::util::{get_property_value_for_version, semver_parse};
 use crate::validation::ValidationResult;
+use std::ops::Deref;
 
 pub mod error;
 pub mod ser;
@@ -58,8 +59,7 @@ impl ProductConfigManager {
     ///
     /// # Arguments
     ///
-    /// * `config_reader` - config_reader implementation
-    ///
+    /// * `file_path` - the path to the YAML file
     pub fn from_yaml_file(file_path: &str) -> ValidationResult<Self> {
         let contents = fs::read_to_string(file_path).map_err(|_| error::Error::FileNotFound {
             file_name: file_path.to_string(),
@@ -83,8 +83,8 @@ impl ProductConfigManager {
     /// # Arguments
     ///
     /// * `version` - the current product version
-    /// * `kind` - kind provided by the user
     /// * `role` - role provided by the user
+    /// * `kind` - kind provided by the user
     /// * `user_config` - map with property name and values (the explicit user config properties)
     ///
     /// # Examples
@@ -107,46 +107,38 @@ impl ProductConfigManager {
     ///
     /// let env_sh = config.get(
     ///     "0.5.0",
-    ///     &PropertyNameKind::File("env.sh".to_string()),
     ///     "role_1",
+    ///     &PropertyNameKind::File("env.sh".to_string()),
     ///     &user_data,
     /// );
     /// ```
-    ///
     pub fn get(
         &self,
         version: &str,
-        kind: &PropertyNameKind,
         role: &str,
-        user_config: &HashMap<String, String>,
-    ) -> ValidationResult<HashMap<String, PropertyValidationResult>> {
-        let mut result_config = HashMap::new();
+        kind: &PropertyNameKind,
+        user_config: HashMap<String, Option<String>>,
+    ) -> ValidationResult<BTreeMap<String, PropertyValidationResult>> {
+        let mut result_config = BTreeMap::new();
 
         let product_version = semver_parse(version)?;
 
         // merge provided user properties with extracted property spec via role / kind and
         // dependencies to be validated later.
-        let merged_properties = self.merge_properties(&product_version, kind, role, user_config);
+        let merged_properties = self.merge_properties(&product_version, role, kind, user_config);
 
-        for (name, value) in &merged_properties {
-            let property_name = &PropertyName {
-                name: name.clone(),
-                kind: kind.clone(),
-            };
-
-            // result_config.insert(
-            //     property_name.name.clone(),
-            //     validation::validate(
-            //         &self.property_specs,
-            //         &self.config_spec,
-            //         &merged_properties,
-            //         &product_version,
-            //         role,
-            //         property_name,
-            //         value,
-            //     ),
-            // );
-        }
+        // result_config.insert(
+        //     property_name.name.clone(),
+        //     validation::validate(
+        //         &self.property_specs,
+        //         &self.config_spec,
+        //         &merged_properties,
+        //         &product_version,
+        //         role,
+        //         property_name,
+        //         value,
+        //     ),
+        // );
 
         Ok(result_config)
     }
@@ -157,49 +149,71 @@ impl ProductConfigManager {
     /// # Arguments
     ///
     /// * `version` - the current product version
-    /// * `kind` - property name kind provided by the user
     /// * `role` - property role provided by the user
+    /// * `kind` - property name kind provided by the user
     /// * `user_config` - map with property name and values (the explicit user config properties)
-    ///
-    fn merge_properties(
+    pub fn merge_properties(
         &self,
         version: &Version,
-        kind: &PropertyNameKind,
         role: &str,
-        user_config: &HashMap<String, String>,
-    ) -> HashMap<String, String> {
-        // Vec<(PropertySpec, user_value / recommended / default)
+        kind: &PropertyNameKind,
+        user_config: HashMap<String, Option<String>>,
+    ) -> ValidationResult<HashMap<String, Option<String>>> {
         let mut merged_properties = HashMap::new();
-        //
-        //     if let Ok(properties) =
-        //         util::get_matching_properties(&self.property_specs, kind, role, version)
-        //     {
-        //         merged_properties.extend(properties)
-        //     }
-        //
-        //     if let Ok(dependencies) =
-        //         util::get_matching_dependencies(&self.property_specs, user_config, version, kind)
-        //     {
-        //         merged_properties.extend(dependencies);
-        //     }
-        //
-        //     merged_properties.extend(user_config.clone());
-        //
-        merged_properties
+
+        for property in &self.config.properties {
+            if !property.has_role_required(role) {
+                continue;
+            }
+
+            if !property.is_version_supported(version)? {
+                continue;
+            }
+
+            if let Some((name, value)) = property.recommended_or_default(version, kind) {
+                merged_properties.insert(name, value);
+            }
+
+            if let Some(expands_to) = &property.expands_to {
+                for dependency in expands_to {
+                    if !dependency.property.has_role(role) {
+                        continue;
+                    }
+
+                    if !dependency.property.is_version_supported(version)? {
+                        continue;
+                    }
+
+                    if let Some(name) = dependency.property.name_from_kind(kind) {
+                        if dependency.value.is_some() {
+                            merged_properties.insert(name, dependency.value.clone());
+                        } else if let Some((_, value)) =
+                            dependency.property.recommended_or_default(version, kind)
+                        {
+                            merged_properties.insert(name, value);
+                        }
+                    }
+                }
+            }
+        }
+
+        merged_properties.extend(user_config);
+
+        Ok(merged_properties)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
+    use std::collections::{BTreeMap, HashMap};
 
-    use rstest::*;
-
+    use super::*;
     use crate::error::Error;
     use crate::types::{PropertyName, PropertyNameKind};
     use crate::util::semver_parse;
     use crate::ProductConfigManager;
     use crate::PropertyValidationResult;
+    use rstest::*;
 
     const ENV_INTEGER_PORT_MIN_MAX: &str = "ENV_INTEGER_PORT_MIN_MAX";
 
@@ -217,15 +231,15 @@ mod tests {
     const CONF_FILE: &str = "env.sh";
 
     fn create_empty_data_and_expected() -> (
-        HashMap<String, String>,
-        HashMap<String, PropertyValidationResult>,
+        HashMap<String, Option<String>>,
+        BTreeMap<String, PropertyValidationResult>,
     ) {
         let float_recommended = "50.0";
         let port_recommended = "20000";
 
         let data = HashMap::new();
 
-        let mut expected = HashMap::new();
+        let mut expected = BTreeMap::new();
         expected.insert(
             ENV_INTEGER_PORT_MIN_MAX.to_string(),
             PropertyValidationResult::RecommendedDefault(port_recommended.to_string()),
@@ -238,8 +252,8 @@ mod tests {
     }
 
     fn create_correct_data_and_expected() -> (
-        HashMap<String, String>,
-        HashMap<String, PropertyValidationResult>,
+        HashMap<String, Option<String>>,
+        BTreeMap<String, PropertyValidationResult>,
     ) {
         let port = "12345";
         let ssl_enabled = "true";
@@ -247,14 +261,14 @@ mod tests {
         let float_value = "55.555";
 
         let mut data = HashMap::new();
-        data.insert(ENV_INTEGER_PORT_MIN_MAX.to_string(), port.to_string());
+        data.insert(ENV_INTEGER_PORT_MIN_MAX.to_string(), Some(port.to_string()));
         data.insert(
             ENV_SSL_CERTIFICATE_PATH.to_string(),
-            certificate_path.to_string(),
+            Some(certificate_path.to_string()),
         );
-        data.insert(ENV_FLOAT.to_string(), float_value.to_string());
+        data.insert(ENV_FLOAT.to_string(), Some(float_value.to_string()));
 
-        let mut expected = HashMap::new();
+        let mut expected = BTreeMap::new();
 
         expected.insert(
             ENV_INTEGER_PORT_MIN_MAX.to_string(),
@@ -296,13 +310,13 @@ mod tests {
         #[case] version: &str,
         #[case] kind: &PropertyNameKind,
         #[case] role: &str,
-        #[case] user_data: HashMap<String, String>,
-        #[case] expected: HashMap<String, PropertyValidationResult>,
+        #[case] user_data: HashMap<String, Option<String>>,
+        #[case] expected: BTreeMap<String, PropertyValidationResult>,
     ) {
         let manager =
             ProductConfigManager::from_yaml_file("data/test_product_config.yaml").unwrap();
 
-        let result = manager.get(version, kind, role, &user_data).unwrap();
+        let result = manager.get(version, role, kind, user_data).unwrap();
 
         println!("Size: {}", result.len());
         for x in &result {
@@ -318,15 +332,21 @@ mod tests {
             ProductConfigManager::from_yaml_file("data/test_product_config.yaml").unwrap();
 
         let mut user_config = HashMap::new();
-        user_config.insert(ENV_INTEGER_PORT_MIN_MAX.to_string(), "5000".to_string());
-        user_config.insert(ENV_FLOAT.to_string(), "5.888".to_string());
-        user_config.insert(ENV_SSL_CERTIFICATE_PATH.to_string(), "a/b/c".to_string());
+        user_config.insert(
+            ENV_INTEGER_PORT_MIN_MAX.to_string(),
+            Some("5000".to_string()),
+        );
+        user_config.insert(ENV_FLOAT.to_string(), Some("5.888".to_string()));
+        user_config.insert(
+            ENV_SSL_CERTIFICATE_PATH.to_string(),
+            Some("a/b/c".to_string()),
+        );
 
         let properties = manager.merge_properties(
             &semver_parse(VERSION_0_5_0).unwrap(),
-            &PropertyNameKind::File("env.sh".to_string()),
             ROLE_1,
-            &user_config,
+            &PropertyNameKind::File("env.sh".to_string()),
+            user_config,
         );
 
         let mut expected = HashMap::new();
@@ -345,5 +365,15 @@ mod tests {
         //ENV_SSL_CERTIFICATE_PATH "a/b/c"
         // expected
         //ENV_SSL_ENABLED "true"
+
+        println!(
+            "{:?}",
+            manager.merge_properties(
+                &semver_parse(VERSION_0_5_0).unwrap(),
+                ROLE_1,
+                &PropertyNameKind::File(CONF_FILE.to_string()),
+                HashMap::new()
+            )
+        )
     }
 }
