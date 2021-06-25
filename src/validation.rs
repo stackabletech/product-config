@@ -14,8 +14,6 @@ pub type ValidationResult<T> = Result<T, Error>;
 /// Returns the provided property_value if no validation errors appear
 ///
 /// # Arguments
-/// * `property_spec` - map with PropertyName as key and the corresponding PropertySpec as value
-/// * `config_spec` - config spec that contains customizable data like e.g. unit and regex
 /// * `merged_properties` - merged user and property spec (matching role, kind etc.)
 /// * `product_version` - version of the currently active product version
 /// * `role` - the user role to validate against
@@ -31,6 +29,7 @@ pub(crate) fn validate(
     property_name: &PropertyName,
     property_value: &str,
 ) -> PropertyValidationResult {
+    /*
     // a missing / wrong property stops us from doing any other validation
     let property = match property_spec.get(&property_name) {
         None => {
@@ -131,6 +130,7 @@ pub(crate) fn validate(
     }
 
     PropertyValidationResult::Valid(property_value.to_string())
+    */
 }
 
 

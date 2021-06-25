@@ -1,16 +1,18 @@
-use crate::util::{get_property_value_for_version, semver_parse};
-use crate::validation::ValidationResult;
+use std::cmp::Ordering;
+use std::collections::HashMap;
+use std::iter::FromIterator;
+use std::ops::Deref;
+use std::{fmt, ops};
+
 use regex::Regex;
 use schemars::gen::SchemaGenerator;
 use schemars::schema::Schema;
 use schemars::JsonSchema;
 use semver::Version;
 use serde::{de, Deserialize, Deserializer};
-use std::cmp::Ordering;
-use std::collections::HashMap;
-use std::iter::FromIterator;
-use std::ops::Deref;
-use std::{fmt, ops};
+
+use crate::util::semver_parse;
+use crate::validation::ValidationResult;
 
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialOrd, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -318,9 +320,10 @@ pub struct Role {
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use std::error::Error;
     use std::fs;
+
+    use super::*;
 
     #[test]
     fn test_experiment_load_sample_product_config_via_serde() -> Result<(), Box<dyn Error>> {

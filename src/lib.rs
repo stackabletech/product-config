@@ -19,7 +19,7 @@ use semver::Version;
 
 use crate::error::Error;
 use crate::types::{ProductConfig, PropertyName, PropertyNameKind, PropertySpec};
-use crate::util::{get_property_value_for_version, semver_parse};
+use crate::util::semver_parse;
 use crate::validation::ValidationResult;
 use std::ops::Deref;
 
@@ -47,6 +47,9 @@ pub enum PropertyValidationResult {
     RecommendedDefault(String),
     /// On Valid, the value passed all checks and can be used.
     Valid(String),
+    /// On Override the given property name does not exist in the product config, and therefore
+    /// no checks could be applied for the value.
+    Override(String),
     /// On warn, the value maybe used with caution.
     Warn(String, Error),
     /// On error, check the provided config and config values.
@@ -118,29 +121,20 @@ impl ProductConfigManager {
         role: &str,
         kind: &PropertyNameKind,
         user_config: HashMap<String, Option<String>>,
-    ) -> ValidationResult<BTreeMap<String, PropertyValidationResult>> {
+    ) -> BTreeMap<String, PropertyValidationResult> {
         let mut result_config = BTreeMap::new();
 
         let product_version = semver_parse(version)?;
 
         // merge provided user properties with extracted property spec via role / kind and
         // dependencies to be validated later.
-        let merged_properties = self.merge_properties(&product_version, role, kind, user_config);
+        let mut merged_properties = self
+            .get_and_expand_properties(&product_version, role, kind)
+            .unwrap();
 
-        // result_config.insert(
-        //     property_name.name.clone(),
-        //     validation::validate(
-        //         &self.property_specs,
-        //         &self.config_spec,
-        //         &merged_properties,
-        //         &product_version,
-        //         role,
-        //         property_name,
-        //         value,
-        //     ),
-        // );
+        merged_properties.extend(user_config);
 
-        Ok(result_config)
+        self.validate(&product_version, role, kind, merged_properties);
     }
 
     /// Merge provided user config properties and available property spec (from JSON, YAML...)
@@ -151,13 +145,11 @@ impl ProductConfigManager {
     /// * `version` - the current product version
     /// * `role` - property role provided by the user
     /// * `kind` - property name kind provided by the user
-    /// * `user_config` - map with property name and values (the explicit user config properties)
-    pub fn merge_properties(
+    pub fn get_and_expand_properties(
         &self,
         version: &Version,
         role: &str,
         kind: &PropertyNameKind,
-        user_config: HashMap<String, Option<String>>,
     ) -> ValidationResult<HashMap<String, Option<String>>> {
         let mut merged_properties = HashMap::new();
 
@@ -197,9 +189,56 @@ impl ProductConfigManager {
             }
         }
 
-        merged_properties.extend(user_config);
-
         Ok(merged_properties)
+    }
+
+    /// Returns the provided property_value if no validation errors appear
+    ///
+    /// # Arguments
+    /// * `version` - the current product version
+    /// * `role` - property role provided by the user
+    /// * `kind` - property name kind provided by the user
+    /// * `merged_properties` - merged user and property spec (matching role, kind etc.)
+    pub fn validate(
+        &self,
+        version: &Version,
+        role: &str,
+        kind: &PropertyNameKind,
+        merged_properties: HashMap<String, Option<String>>,
+    ) -> BTreeMap<String, PropertyValidationResult> {
+        let mut result = BTreeMap::new();
+
+        for (name, value) in merged_properties {
+            if let Some(property) = self.look_up_property(&name, role, kind, version) {
+                if !property.is_version_supported(version).unwrap() {}
+
+                if !property.has_role(role) {
+                    continue;
+                }
+            } else {
+                result.insert(name, PropertyValidationResult::Override(value.to_string()))
+            }
+        }
+
+        result
+    }
+
+    pub fn look_up_property(
+        &self,
+        name: &str,
+        role: &str,
+        kind: &PropertyNameKind,
+        version: &Version,
+    ) -> Option<PropertySpec> {
+        for property in self.config.properties {
+            if property.name_from_kind(kind) != Some(name.to_string()) {
+                continue;
+            }
+
+            return Some(property.property);
+        }
+
+        None
     }
 }
 
@@ -342,13 +381,6 @@ mod tests {
             Some("a/b/c".to_string()),
         );
 
-        let properties = manager.merge_properties(
-            &semver_parse(VERSION_0_5_0).unwrap(),
-            ROLE_1,
-            &PropertyNameKind::File("env.sh".to_string()),
-            user_config,
-        );
-
         let mut expected = HashMap::new();
         // vaild, expected
         expected.insert(ENV_INTEGER_PORT_MIN_MAX.to_string(), "5000".to_string());
@@ -368,11 +400,10 @@ mod tests {
 
         println!(
             "{:?}",
-            manager.merge_properties(
+            manager.get_and_expand_properties(
                 &semver_parse(VERSION_0_5_0).unwrap(),
                 ROLE_1,
                 &PropertyNameKind::File(CONF_FILE.to_string()),
-                HashMap::new()
             )
         )
     }

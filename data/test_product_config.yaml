@@ -161,7 +161,7 @@ properties:
       deprecatedSince: "0.4.0"
   - property: &allowedValues
       propertyNames:
-        - name: "ENV_allowedValues"
+        - name: "ENV_ALLOWED_VALUES"
           kind:
             type: "file"
             file: "env.sh"
