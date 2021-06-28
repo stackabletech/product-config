@@ -122,9 +122,9 @@ impl ProductConfigManager {
         kind: &PropertyNameKind,
         user_config: HashMap<String, Option<String>>,
     ) -> BTreeMap<String, PropertyValidationResult> {
-        let mut result_config = BTreeMap::new();
+        let mut result_config: BTreeMap<String, PropertyValidationResult> = BTreeMap::new();
 
-        let product_version = semver_parse(version)?;
+        let product_version = semver_parse(version).unwrap();
 
         // merge provided user properties with extracted property spec via role / kind and
         // dependencies to be validated later.
@@ -134,7 +134,7 @@ impl ProductConfigManager {
 
         merged_properties.extend(user_config);
 
-        self.validate(&product_version, role, kind, merged_properties);
+        self.validate(&product_version, role, kind, merged_properties)
     }
 
     /// Merge provided user config properties and available property spec (from JSON, YAML...)
@@ -150,8 +150,8 @@ impl ProductConfigManager {
         version: &Version,
         role: &str,
         kind: &PropertyNameKind,
-    ) -> ValidationResult<HashMap<String, Option<String>>> {
-        let mut merged_properties = HashMap::new();
+    ) -> ValidationResult<BTreeMap<String, Option<String>>> {
+        let mut merged_properties = BTreeMap::new();
 
         for property in &self.config.properties {
             if !property.has_role_required(role) {
@@ -204,22 +204,22 @@ impl ProductConfigManager {
         version: &Version,
         role: &str,
         kind: &PropertyNameKind,
-        merged_properties: HashMap<String, Option<String>>,
+        merged_properties: BTreeMap<String, Option<String>>,
     ) -> BTreeMap<String, PropertyValidationResult> {
         let mut result = BTreeMap::new();
+        /*
+                for (name, value) in merged_properties {
+                    if let Some(property) = self.look_up_property(&name, role, kind, version) {
+                        if !property.is_version_supported(version).unwrap() {}
 
-        for (name, value) in merged_properties {
-            if let Some(property) = self.look_up_property(&name, role, kind, version) {
-                if !property.is_version_supported(version).unwrap() {}
-
-                if !property.has_role(role) {
-                    continue;
+                        if !property.has_role(role) {
+                            continue;
+                        }
+                    } else {
+                        result.insert(name, PropertyValidationResult::Override(value.to_string()))
+                    }
                 }
-            } else {
-                result.insert(name, PropertyValidationResult::Override(value.to_string()))
-            }
-        }
-
+        */
         result
     }
 
@@ -230,12 +230,12 @@ impl ProductConfigManager {
         kind: &PropertyNameKind,
         version: &Version,
     ) -> Option<PropertySpec> {
-        for property in self.config.properties {
-            if property.name_from_kind(kind) != Some(name.to_string()) {
+        for propertyAnchor in &self.config.properties {
+            if propertyAnchor.name_from_kind(kind) != Some(name.to_string()) {
                 continue;
             }
 
-            return Some(property.property);
+            return Some(propertyAnchor.property.clone());
         }
 
         None
@@ -355,7 +355,7 @@ mod tests {
         let manager =
             ProductConfigManager::from_yaml_file("data/test_product_config.yaml").unwrap();
 
-        let result = manager.get(version, role, kind, user_data).unwrap();
+        let result = manager.get(version, role, kind, user_data);
 
         println!("Size: {}", result.len());
         for x in &result {
@@ -381,13 +381,19 @@ mod tests {
             Some("a/b/c".to_string()),
         );
 
-        let mut expected = HashMap::new();
+        let mut expected = BTreeMap::new();
         // vaild, expected
-        expected.insert(ENV_INTEGER_PORT_MIN_MAX.to_string(), "5000".to_string());
+        expected.insert(
+            ENV_INTEGER_PORT_MIN_MAX.to_string(),
+            Some("5000".to_string()),
+        );
         // valid, expected
-        expected.insert(ENV_FLOAT.to_string(), "5.888".to_string());
+        expected.insert(ENV_FLOAT.to_string(), Some("5.888".to_string()));
         // expected
-        expected.insert(ENV_PROPERTY_STRING_DEPRECATED.to_string(), "".to_string());
+        expected.insert(
+            ENV_PROPERTY_STRING_DEPRECATED.to_string(),
+            Some("".to_string()),
+        );
         //ENV_PROPERTY_STRING_DEPRECATED PropertyValidationResult::Error()
         // required but no recommended or default value: expected
         //ENV_SECURITY_PASSWORD PropertyValidationResult::Error()
@@ -398,13 +404,14 @@ mod tests {
         // expected
         //ENV_SSL_ENABLED "true"
 
-        println!(
-            "{:?}",
-            manager.get_and_expand_properties(
+        let got = manager
+            .get_and_expand_properties(
                 &semver_parse(VERSION_0_5_0).unwrap(),
                 ROLE_1,
                 &PropertyNameKind::File(CONF_FILE.to_string()),
             )
-        )
+            .unwrap();
+
+        assert_eq!(expected, got);
     }
 }
