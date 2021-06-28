@@ -88,7 +88,7 @@ impl PropertySpec {
         None
     }
 
-    fn filter_value(&self, version: &Version, values: &[PropertyValueSpec]) -> Option<String> {
+    pub fn filter_value(&self, version: &Version, values: &[PropertyValueSpec]) -> Option<String> {
         for value in values {
             if let Some(from) = &value.from_version {
                 let from_version = semver_parse(from).unwrap();

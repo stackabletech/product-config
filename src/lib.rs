@@ -207,19 +207,75 @@ impl ProductConfigManager {
         merged_properties: BTreeMap<String, Option<String>>,
     ) -> BTreeMap<String, PropertyValidationResult> {
         let mut result = BTreeMap::new();
-        /*
-                for (name, value) in merged_properties {
-                    if let Some(property) = self.look_up_property(&name, role, kind, version) {
-                        if !property.is_version_supported(version).unwrap() {}
 
-                        if !property.has_role(role) {
+        for (name, value) in merged_properties {
+            match value {
+                Some(val) => {
+                    let property = match self.look_up_property(&name, role, kind, version) {
+                        Some(property) => property,
+                        None => {
+                            result
+                                .insert(name, PropertyValidationResult::Override(val.to_string()));
                             continue;
                         }
-                    } else {
-                        result.insert(name, PropertyValidationResult::Override(value.to_string()))
+                    };
+
+                    let check_datatype = validation::check_datatype(&property, &name, &val);
+                    if check_datatype.is_err() {
+                        result.insert(
+                            name.to_string(),
+                            PropertyValidationResult::Error(
+                                val.to_string(),
+                                check_datatype.err().unwrap(),
+                            ),
+                        );
+                        continue;
                     }
+
+                    // TODO: deprecated check
+
+                    // value is valid, check if it matches recommended or default values
+                    // was provided by recommended value?
+                    if let Some(recommended) = &property.recommended_values {
+                        let recommended_value =
+                            property.filter_value(version, recommended.as_slice());
+                        if recommended_value == Some(val.to_string()) {
+                            result.insert(
+                                name.to_string(),
+                                PropertyValidationResult::RecommendedDefault(val.to_string()),
+                            );
+                            continue;
+                        }
+                    }
+
+                    // was provided by recommended value?
+                    if let Some(default) = &property.default_values {
+                        let default_value = property.filter_value(version, default.as_slice());
+                        if default_value == Some(val.to_string()) {
+                            result.insert(
+                                name.to_string(),
+                                PropertyValidationResult::Default(val.to_string()),
+                            );
+                            continue;
+                        }
+                    }
+
+                    result.insert(
+                        name.to_string(),
+                        PropertyValidationResult::Valid(val.to_string()),
+                    );
                 }
-        */
+                None => {
+                    // TODO: we currently do not have nullable field in the spec; if we add this
+                    //    we can perform the nullable check here.
+                    result.insert(
+                        name.to_string(),
+                        PropertyValidationResult::Valid("".to_string()),
+                    );
+                }
+            }
+        }
+
         result
     }
 
@@ -232,6 +288,14 @@ impl ProductConfigManager {
     ) -> Option<PropertySpec> {
         for propertyAnchor in &self.config.properties {
             if propertyAnchor.name_from_kind(kind) != Some(name.to_string()) {
+                continue;
+            }
+
+            if !propertyAnchor.has_role(role) {
+                continue;
+            }
+
+            if propertyAnchor.is_version_supported(version).is_err() {
                 continue;
             }
 

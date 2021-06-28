@@ -214,7 +214,6 @@ pub(crate) fn validate_property_spec(
 
     Ok(())
 }
-
 /// Check if the final used value corresponds to e.g. recommended or default values
 ///
 /// # Arguments
@@ -224,7 +223,7 @@ pub(crate) fn validate_property_spec(
 /// * `property_values` - possible property names e.g. default or recommended values
 /// * `product_version` - the provided product version
 ///
-fn check_property_value_used(
+fn is(
     property_name: &PropertyName,
     property_value: &str,
     property_values: &Option<Vec<PropertyValueSpec>>,
@@ -238,6 +237,48 @@ fn check_property_value_used(
     }
 
     Ok(false)
+}
+/// Extract the provided value from recommended / default values that matches the product version.
+/// Check if there exists a recommended / default value that has a range (if provided) with
+/// from_version and to_version that includes the product version. E.g. if from_version is 1.0.0
+/// and to_version is 1.9.99, we have a value for product version 1.5.0 but not 2.0.0.
+///
+/// # Arguments
+///
+/// * `property_name` - name of the property
+/// * `property_values` - list of property values and their respective versions
+/// * `product_version` - the product version
+///
+pub(crate) fn get_property_value_for_version(
+    property_name: &PropertyName,
+    property_values: &[PropertyValueSpec],
+    product_version: &Version,
+) -> ValidationResult<PropertyValueSpec> {
+    for value in property_values {
+        if let Some(from) = &value.from_version {
+            let from_version = semver_parse(from)?;
+
+            if from_version > *product_version {
+                continue;
+            }
+        }
+
+        if let Some(to) = &value.to_version {
+            let to_version = semver_parse(to)?;
+
+            if to_version < *product_version {
+                continue;
+            }
+        }
+
+        return Ok(value.clone());
+    }
+
+    Err(Error::PropertySpecValueMissingForVersion {
+        property_name: property_name.clone(),
+        property_values: Vec::from(property_values),
+        version: product_version.to_string(),
+    })
 }
 
 /// Check if property role is available
@@ -400,7 +441,7 @@ fn check_dependencies(
 
     Ok(())
 }
-
+*/
 /// Check if property value fits the provided datatype
 /// # Arguments
 ///
@@ -409,31 +450,23 @@ fn check_dependencies(
 /// * `property_value` - property value to be validated
 /// * `datatype` - property datatype containing min/max bounds, units etc.
 ///
-fn check_datatype(
-    config_spec_units: &HashMap<String, Regex>,
-    property_name: &PropertyName,
-    property_value: &str,
-    datatype: &Datatype,
+pub(crate) fn check_datatype(
+    property: &PropertySpec,
+    name: &str,
+    value: &str,
 ) -> ValidationResult<()> {
-    match datatype {
+    match &property.datatype {
         Datatype::Bool => {
-            check_datatype_scalar::<bool>(property_name, property_value, &None, &None)?;
+            check_datatype_scalar::<bool>(name, value, &None, &None)?;
         }
         Datatype::Integer { min, max, .. } => {
-            check_datatype_scalar::<i64>(property_name, property_value, min, max)?;
+            check_datatype_scalar::<i64>(name, value, min, max)?;
         }
         Datatype::Float { min, max, .. } => {
-            check_datatype_scalar::<f64>(property_name, property_value, min, max)?;
+            check_datatype_scalar::<f64>(name, value, min, max)?;
         }
         Datatype::String { min, max, unit, .. } => {
-            check_datatype_string(
-                config_spec_units,
-                property_name,
-                property_value,
-                min,
-                max,
-                unit,
-            )?;
+            check_datatype_string(name, value, min, max, unit)?;
         }
         Datatype::Array { .. } => {
             // TODO: implement logic for array type
@@ -471,14 +504,14 @@ fn check_allowed_values(
 ///
 /// # Arguments
 ///
-/// * `property_name` - name of the property
-/// * `property_value` - the value belonging to the property to be validated
+/// * `name` - name of the property
+/// * `value` - the value belonging to the property to be validated
 /// * `min` - minimum value specified
 /// * `max` - maximum value specified
 ///
 fn check_datatype_scalar<T>(
-    property_name: &PropertyName,
-    property_value: &str,
+    name: &str,
+    value: &str,
     min: &Option<String>,
     max: &Option<String>,
 ) -> ValidationResult<T>
@@ -486,11 +519,11 @@ where
     T: FromStr + std::cmp::PartialOrd + Display + Copy,
 {
     // check if config_value fits datatype
-    let val: T = parse::<T>(property_name, property_value)?;
+    let val: T = parse::<T>(name, value)?;
     // check min bound
-    check_bound(property_name, val, min, min_bound)?;
+    check_bound(name, val, min, min_bound)?;
     // check max bound
-    check_bound(property_name, val, max, max_bound)?;
+    check_bound(name, val, max, max_bound)?;
 
     Ok(val)
 }
@@ -499,33 +532,31 @@ where
 ///
 /// # Arguments
 ///
-/// * `config_spec_units` - map with unit name and respective regular expression to evaluate the datatype
-/// * `property_name` - name of the property
-/// * `property_value` - the value belonging to the property to be validated
+/// * `name` - name of the property
+/// * `value` - the value belonging to the property to be validated
 /// * `min` - minimum value specified
 /// * `max` - maximum value specified
 /// * `unit` - provided unit to get the regular expression to parse the property_value
 ///
 fn check_datatype_string(
-    config_spec_units: &HashMap<String, Regex>,
-    property_name: &PropertyName,
-    property_value: &str,
+    name: &str,
+    value: &str,
     min: &Option<String>,
     max: &Option<String>,
     unit: &Option<Unit>,
 ) -> ValidationResult<()> {
-    let len: usize = property_value.len();
-    check_bound::<usize>(property_name, len, min, min_bound)?;
-    check_bound::<usize>(property_name, len, max, max_bound)?;
+    let len: usize = value.len();
+    check_bound::<usize>(name, len, min, min_bound)?;
+    check_bound::<usize>(name, len, max, max_bound)?;
 
-    // if let Some(unit) = unit {
-    //     if !unit.regex.is_match(property_value) {
-    //         return Err(Error::DatatypeRegexNotMatching {
-    //             property_name: property_name.clone(),
-    //             value: property_value.to_string(),
-    //         });
-    //     }
-    // }
+    if let Some(unit) = unit {
+        if !unit.regex.is_match(value) {
+            return Err(Error::DatatypeRegexNotMatching {
+                property_name: name.to_string(),
+                value: value.to_string(),
+            });
+        }
+    }
 
     Ok(())
 }
@@ -568,7 +599,7 @@ where
 /// * `check_out_of_bound` - the method to check against the bound
 ///
 fn check_bound<T>(
-    property_name: &PropertyName,
+    name: &str,
     value: T,
     bound: &Option<String>,
     check_out_of_bound: fn(T, T) -> bool,
@@ -577,10 +608,10 @@ where
     T: FromStr + std::cmp::PartialOrd + Display + Copy,
 {
     if let Some(bound) = bound {
-        let bound: T = parse::<T>(property_name, bound.as_str())?;
+        let bound: T = parse::<T>(name, bound.as_str())?;
         if check_out_of_bound(value, bound) {
             return Err(Error::PropertyValueOutOfBounds {
-                property_name: property_name.clone(),
+                property_name: name.to_string(),
                 received: value.to_string(),
                 expected: bound.to_string(),
             });
@@ -597,18 +628,20 @@ where
 /// * `property_name` - name of the property
 /// * `to_parse` - value to be parsed into a certain T
 ///
-fn parse<T: FromStr>(property_name: &PropertyName, to_parse: &str) -> Result<T, Error> {
+fn parse<T: FromStr>(name: &str, to_parse: &str) -> Result<T, Error> {
     match to_parse.parse::<T>() {
         Ok(to_parse) => Ok(to_parse),
         Err(_) => {
             return Err(Error::DatatypeNotMatching {
-                property_name: property_name.clone(),
+                property_name: name.to_string(),
                 value: to_parse.to_string(),
                 datatype: std::any::type_name::<T>().to_string(),
             })
         }
     }
 }
+
+/*
 #[cfg(test)]
 mod tests {
     macro_rules! hashmap {

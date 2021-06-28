@@ -43,7 +43,7 @@ pub enum Error {
 
     #[error("[{0}]: provided value '{received}' violates min/max bound '{expected}'")]
     PropertyValueOutOfBounds {
-        property_name: PropertyName,
+        property_name: String,
         received: String,
         expected: String,
     },
@@ -67,14 +67,14 @@ pub enum Error {
 
     #[error("[{property_name}]: value '{value}' not of specified type: '{datatype}'")]
     DatatypeNotMatching {
-        property_name: PropertyName,
+        property_name: String,
         value: String,
         datatype: String,
     },
 
     #[error("[{property_name}]: value '{value}' does not match regex")]
     DatatypeRegexNotMatching {
-        property_name: PropertyName,
+        property_name: String,
         value: String,
     },
 
