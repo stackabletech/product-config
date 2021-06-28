@@ -1,7 +1,4 @@
 use std::cmp::Ordering;
-use std::collections::HashMap;
-use std::iter::FromIterator;
-use std::ops::Deref;
 use std::{fmt, ops};
 
 use regex::Regex;
@@ -155,13 +152,6 @@ impl PropertySpec {
         Ok(false)
     }
 
-    pub fn property_name(&self, kind: &PropertyNameKind) -> Vec<String> {
-        Vec::from_iter(
-            self.property_names
-                .iter()
-                .map(|property| property.name.clone()),
-        )
-    }
     pub fn all_property_names(&self) -> Vec<String> {
         self.property_names
             .iter()

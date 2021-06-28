@@ -1,11 +1,5 @@
 use crate::error::Error;
-use crate::types::{Datatype, PropertyName, PropertySpec, PropertyValueSpec, Role, Unit};
-use crate::util;
-use crate::util::semver_parse;
-use crate::PropertyValidationResult;
-use regex::Regex;
-use semver::Version;
-use std::collections::HashMap;
+use crate::types::{Datatype, PropertyName, PropertySpec, Unit};
 use std::fmt::Display;
 use std::str::FromStr;
 

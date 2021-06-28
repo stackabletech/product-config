@@ -1,10 +1,8 @@
 use crate::error::Error;
-use crate::types::{
-    PropertyDependency, PropertyName, PropertyNameKind, PropertySpec, PropertyValueSpec,
-};
+use crate::types::{PropertyNameKind, PropertySpec};
 use crate::validation::ValidationResult;
 use semver::Version;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::hash::Hash;
 
 /// This is a helper method to merge SemVer errors and the product config errors. Since
@@ -30,4 +28,35 @@ where
         }
     }
     false
+}
+
+pub(crate) fn expand_properties(
+    property: &PropertySpec,
+    version: &Version,
+    role: &str,
+    kind: &PropertyNameKind,
+) -> ValidationResult<BTreeMap<String, Option<String>>> {
+    let mut result = BTreeMap::new();
+    if let Some(expands_to) = &property.expands_to {
+        for dependency in expands_to {
+            if !dependency.property.has_role(role) {
+                continue;
+            }
+
+            if !dependency.property.is_version_supported(version)? {
+                continue;
+            }
+
+            if let Some(name) = dependency.property.name_from_kind(kind) {
+                if dependency.value.is_some() {
+                    result.insert(name, dependency.value.clone());
+                } else if let Some((_, value)) =
+                    dependency.property.recommended_or_default(version, kind)
+                {
+                    result.insert(name, value);
+                }
+            }
+        }
+    }
+    Ok(result)
 }

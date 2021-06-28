@@ -19,9 +19,8 @@ use semver::Version;
 
 use crate::error::Error;
 use crate::types::{ProductConfig, PropertyName, PropertyNameKind, PropertySpec};
-use crate::util::semver_parse;
+use crate::util::{expand_properties, semver_parse};
 use crate::validation::ValidationResult;
-use std::ops::Deref;
 
 pub mod error;
 pub mod ser;
@@ -68,10 +67,22 @@ impl ProductConfigManager {
             file_name: file_path.to_string(),
         })?;
 
+        Self::from_str(&contents).map_err(|serde_error| error::Error::YamlFileNotParsable {
+            file: file_path.to_string(),
+            reason: serde_error.to_string(),
+        })
+    }
+
+    /// Create a ProductConfig from a YAML string.
+    ///
+    /// # Arguments
+    ///
+    /// * `contents` - the YAML string content
+    pub fn from_str(contents: &str) -> ValidationResult<Self> {
         Ok(ProductConfigManager {
             config: serde_yaml::from_str(&contents).map_err(|serde_error| {
-                error::Error::FileNotParsable {
-                    file_name: file_path.to_string(),
+                error::Error::YamlNotParsable {
+                    content: contents.to_string(),
                     reason: serde_error.to_string(),
                 }
             })?,
@@ -122,7 +133,7 @@ impl ProductConfigManager {
         kind: &PropertyNameKind,
         user_config: HashMap<String, Option<String>>,
     ) -> BTreeMap<String, PropertyValidationResult> {
-        let mut result_config: BTreeMap<String, PropertyValidationResult> = BTreeMap::new();
+        //let mut result_config: BTreeMap<String, PropertyValidationResult> = BTreeMap::new();
 
         let product_version = semver_parse(version).unwrap();
 
@@ -131,8 +142,6 @@ impl ProductConfigManager {
         let mut merged_properties = self
             .get_and_expand_properties(&product_version, role, kind, user_config)
             .unwrap();
-
-        //merged_properties.extend(user_config);
 
         self.validate(&product_version, role, kind, merged_properties)
     }
@@ -160,27 +169,7 @@ impl ProductConfigManager {
             if util::hashmap_contains_any_key(&user_config, property.all_property_names())
                 && property.has_role(role)
             {
-                if let Some(expands_to) = &property.expands_to {
-                    for dependency in expands_to {
-                        if !dependency.property.has_role(role) {
-                            continue;
-                        }
-
-                        if !dependency.property.is_version_supported(version)? {
-                            continue;
-                        }
-
-                        if let Some(name) = dependency.property.name_from_kind(kind) {
-                            if dependency.value.is_some() {
-                                merged_properties.insert(name, dependency.value.clone());
-                            } else if let Some((_, value)) =
-                                dependency.property.recommended_or_default(version, kind)
-                            {
-                                merged_properties.insert(name, value);
-                            }
-                        }
-                    }
-                }
+                merged_properties.extend(expand_properties(property, version, role, kind)?);
             // If the user does not provide a property that is required and expands into other properties
             // we need to merge them
             } else {
@@ -196,29 +185,11 @@ impl ProductConfigManager {
                     merged_properties.insert(name, value);
                 }
 
-                if let Some(expands_to) = &property.expands_to {
-                    for dependency in expands_to {
-                        if !dependency.property.has_role(role) {
-                            continue;
-                        }
-
-                        if !dependency.property.is_version_supported(version)? {
-                            continue;
-                        }
-
-                        if let Some(name) = dependency.property.name_from_kind(kind) {
-                            if dependency.value.is_some() {
-                                merged_properties.insert(name, dependency.value.clone());
-                            } else if let Some((_, value)) =
-                                dependency.property.recommended_or_default(version, kind)
-                            {
-                                merged_properties.insert(name, value);
-                            }
-                        }
-                    }
-                }
+                merged_properties.extend(expand_properties(property, version, role, kind)?);
             }
         }
+
+        merged_properties.extend(user_config);
 
         Ok(merged_properties)
     }
@@ -240,9 +211,9 @@ impl ProductConfigManager {
         let mut result = BTreeMap::new();
 
         for (name, value) in merged_properties {
-            let temp = self.look_up_property(&name, role, kind, version);
+            let prop = self.look_up_property(&name, role, kind, version);
 
-            match (temp, value) {
+            match (prop, value) {
                 (Some(property), Some(val)) => {
                     let check_datatype = validation::check_datatype(&property, &name, &val);
                     if check_datatype.is_err() {
@@ -321,20 +292,20 @@ impl ProductConfigManager {
         kind: &PropertyNameKind,
         version: &Version,
     ) -> Option<PropertySpec> {
-        for propertyAnchor in &self.config.properties {
-            if propertyAnchor.name_from_kind(kind) != Some(name.to_string()) {
+        for property_anchor in &self.config.properties {
+            if property_anchor.name_from_kind(kind) != Some(name.to_string()) {
                 continue;
             }
 
-            if !propertyAnchor.has_role(role) {
+            if !property_anchor.has_role(role) {
                 continue;
             }
 
-            if propertyAnchor.is_version_supported(version).is_err() {
+            if property_anchor.is_version_supported(version).is_err() {
                 continue;
             }
 
-            return Some(propertyAnchor.property.clone());
+            return Some(property_anchor.property.clone());
         }
 
         None
@@ -343,15 +314,25 @@ impl ProductConfigManager {
 
 #[cfg(test)]
 mod tests {
+    macro_rules! collection {
+        // map-like
+        ($($k:expr => $v:expr),* $(,)?) => {
+            std::iter::Iterator::collect(std::array::IntoIter::new([$(($k, $v),)*]))
+        };
+        // set-like
+        ($($v:expr),* $(,)?) => {
+            std::iter::Iterator::collect(std::array::IntoIter::new([$($v,)*]))
+        };
+    }
+
     use std::collections::{BTreeMap, HashMap};
 
     use super::*;
-    use crate::error::Error;
-    use crate::types::{PropertyName, PropertyNameKind};
+    use crate::types::PropertyNameKind;
     use crate::util::semver_parse;
     use crate::ProductConfigManager;
-    use crate::PropertyValidationResult;
     use rstest::*;
+    use std::hash::Hash;
 
     const ENV_INTEGER_PORT_MIN_MAX: &str = "ENV_INTEGER_PORT_MIN_MAX";
 
@@ -368,98 +349,44 @@ mod tests {
     const VERSION_0_5_0: &str = "0.5.0";
     const CONF_FILE: &str = "env.sh";
 
-    fn create_empty_data_and_expected() -> (
-        HashMap<String, Option<String>>,
-        BTreeMap<String, PropertyValidationResult>,
-    ) {
-        let float_recommended = "50.0";
-        let port_recommended = "20000";
-
-        let data = HashMap::new();
-
-        let mut expected = BTreeMap::new();
-        expected.insert(
-            ENV_INTEGER_PORT_MIN_MAX.to_string(),
-            PropertyValidationResult::RecommendedDefault(port_recommended.to_string()),
-        );
-        expected.insert(
-            ENV_FLOAT.to_string(),
-            PropertyValidationResult::RecommendedDefault(float_recommended.to_string()),
-        );
-        (data, expected)
+    fn macro_to_hash_map(map: HashMap<String, Option<String>>) -> HashMap<String, Option<String>> {
+        map
     }
 
-    fn create_correct_data_and_expected() -> (
-        HashMap<String, Option<String>>,
-        BTreeMap<String, PropertyValidationResult>,
-    ) {
-        let port = "12345";
-        let ssl_enabled = "true";
-        let certificate_path = "/tmp/ssl_key.xyz";
-        let float_value = "55.555";
-
-        let mut data = HashMap::new();
-        data.insert(ENV_INTEGER_PORT_MIN_MAX.to_string(), Some(port.to_string()));
-        data.insert(
-            ENV_SSL_CERTIFICATE_PATH.to_string(),
-            Some(certificate_path.to_string()),
-        );
-        data.insert(ENV_FLOAT.to_string(), Some(float_value.to_string()));
-
-        let mut expected = BTreeMap::new();
-
-        expected.insert(
-            ENV_INTEGER_PORT_MIN_MAX.to_string(),
-            PropertyValidationResult::Valid(port.to_string()),
-        );
-        expected.insert(
-            ENV_SSL_CERTIFICATE_PATH.to_string(),
-            PropertyValidationResult::Valid(certificate_path.to_string()),
-        );
-        expected.insert(
-            ENV_SSL_ENABLED.to_string(),
-            PropertyValidationResult::RecommendedDefault(ssl_enabled.to_string()),
-        );
-        expected.insert(
-            ENV_FLOAT.to_string(),
-            PropertyValidationResult::Valid(float_value.to_string()),
-        );
-
-        (data, expected)
+    fn macro_to_btree_map(
+        map: BTreeMap<String, Option<String>>,
+    ) -> BTreeMap<String, Option<String>> {
+        map
     }
 
     #[rstest]
-    #[case(
-        VERSION_0_5_0,
-        &PropertyNameKind::File(CONF_FILE.to_string()),
-        ROLE_1,
-        create_empty_data_and_expected().0,
-        create_empty_data_and_expected().1,
-    )]
-    #[case(
-      VERSION_0_5_0,
-      &PropertyNameKind::File(CONF_FILE.to_string()),
-      ROLE_1,
-      create_correct_data_and_expected().0,
-      create_correct_data_and_expected().1,
+    #[case::check_xy(
+        "0.5.0",
+        &PropertyNameKind::File("env.sh".to_string()),
+        "role_1",
+        "data/test_yamls/expands_role_required_expandee_role_not_required.yaml",
+        macro_to_hash_map(collection!{ "ENV_PASSWORD".to_string() => Some("secret".to_string()) }),
+        macro_to_btree_map(collection!{
+            "ENV_PASSWORD".to_string() => Some("secret".to_string()),
+            "ENV_ENABLE_PASSWORD".to_string() => Some("true".to_string())
+        }),
     )]
     #[trace]
     fn test_get_kind_conf_role_1(
         #[case] version: &str,
         #[case] kind: &PropertyNameKind,
         #[case] role: &str,
+        #[case] path: &str,
         #[case] user_data: HashMap<String, Option<String>>,
-        #[case] expected: BTreeMap<String, PropertyValidationResult>,
+        #[case] expected: BTreeMap<String, Option<String>>,
     ) {
-        let manager =
-            ProductConfigManager::from_yaml_file("data/test_product_config.yaml").unwrap();
+        let product_version = semver_parse(version).unwrap();
 
-        let result = manager.get(version, role, kind, user_data);
+        let manager = ProductConfigManager::from_yaml_file(path).unwrap();
 
-        println!("Size: {}", result.len());
-        for x in &result {
-            println!("{:?}", x)
-        }
+        let result = manager
+            .get_and_expand_properties(&product_version, role, kind, user_data)
+            .unwrap();
 
         assert_eq!(result, expected);
     }

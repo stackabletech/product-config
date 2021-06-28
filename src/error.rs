@@ -6,8 +6,11 @@ pub enum Error {
     #[error("File not found: {file_name}")]
     FileNotFound { file_name: String },
 
-    #[error("Could not parse file: {file_name}: {reason}")]
-    FileNotParsable { file_name: String, reason: String },
+    #[error("Could not parse yaml file - {file}: {reason}")]
+    YamlFileNotParsable { file: String, reason: String },
+
+    #[error("Could not parse yaml - {content}: {reason}")]
+    YamlNotParsable { content: String, reason: String },
 
     #[error("Invalid SemVer version: {semver_error}")]
     InvalidVersion { semver_error: String },
@@ -48,7 +51,7 @@ pub enum Error {
         expected: String,
     },
 
-    #[error("[{property_name}]: provided config value missing")]
+    #[error("[{property_name}]: config value missing for required property")]
     PropertyValueMissing { property_name: String },
 
     #[error("[{property_name}]: provided property value(s) missing for version '{version}'. Got: {property_values:?}")]
