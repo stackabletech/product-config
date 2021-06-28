@@ -360,7 +360,7 @@ mod tests {
     }
 
     #[rstest]
-    #[case::check_xy(
+    #[case::expands_role_required_expandee_role_not_required(
         "0.5.0",
         &PropertyNameKind::File("env.sh".to_string()),
         "role_1",
@@ -370,6 +370,74 @@ mod tests {
             "ENV_PASSWORD".to_string() => Some("secret".to_string()),
             "ENV_ENABLE_PASSWORD".to_string() => Some("true".to_string())
         }),
+    )]
+    #[case::expands_role_required_expandee_role_not_required_no_user_input(
+        "0.5.0",
+        &PropertyNameKind::File("env.sh".to_string()),
+        "role_1",
+        "data/test_yamls/expands_role_required_expandee_role_not_required.yaml",
+        HashMap::new(),
+        macro_to_btree_map(collection!{
+            "ENV_PASSWORD".to_string() => Some("secret".to_string()),
+            "ENV_ENABLE_PASSWORD".to_string() => Some("true".to_string())
+        }),
+    )]
+    #[case::expands_role_not_required_expandee_role_not_required_no_user_input(
+        "0.5.0",
+        &PropertyNameKind::File("env.sh".to_string()),
+        "role_1",
+        "data/test_yamls/expands_role_not_required_expandee_role_not_required.yaml",
+        HashMap::new(),
+        BTreeMap::new(),
+    )]
+    #[case::expands_role_not_required_expandee_role_required_no_user_input(
+        "0.5.0",
+        &PropertyNameKind::File("env.sh".to_string()),
+        "role_1",
+        "data/test_yamls/expands_role_not_required_expandee_role_required.yaml",
+        HashMap::new(),
+        macro_to_btree_map(collection!{
+            "ENV_ENABLE_PASSWORD".to_string() => None,
+        }),
+    )]
+    #[case::expands_role_not_required_expandee_role_required_with_user_input_1(
+        "0.5.0",
+        &PropertyNameKind::File("env.sh".to_string()),
+        "role_1",
+        "data/test_yamls/expands_role_not_required_expandee_role_required.yaml",
+        macro_to_hash_map(collection!{
+            "ENV_ENABLE_PASSWORD".to_string() => Some("true".to_string())
+        }),
+        macro_to_btree_map(collection!{
+            "ENV_ENABLE_PASSWORD".to_string() => Some("true".to_string()),
+        }),
+    )]
+    #[case::expands_role_not_required_expandee_role_required_with_user_input_2(
+        "0.5.0",
+        &PropertyNameKind::File("env.sh".to_string()),
+        "role_1",
+        "data/test_yamls/expands_role_not_required_expandee_role_required.yaml",
+        macro_to_hash_map(collection!{
+            "ENV_PASSWORD".to_string() => Some("secret".to_string())
+        }),
+        macro_to_btree_map(collection!{
+            "ENV_PASSWORD".to_string() => Some("secret".to_string()),
+            "ENV_ENABLE_PASSWORD".to_string() => Some("true".to_string()),
+        }),
+    )]
+    #[case::test_product_config_no_user_input(
+        "0.5.0",
+        &PropertyNameKind::File("env.sh".to_string()),
+        "role_1",
+        "data/test_product_config.yaml",
+        HashMap::new(),
+        macro_to_btree_map(collection!{
+            "ENV_FLOAT".to_string() => Some("50.0".to_string()),
+            "ENV_INTEGER_PORT_MIN_MAX".to_string() => Some("20000".to_string()),
+            "ENV_PROPERTY_STRING_DEPRECATED".to_string() => None,
+            "ENV_PASSWORD".to_string() => None,
+            "ENV_ENABLE_PASSWORD".to_string() => None,
+    }),
     )]
     #[trace]
     fn test_get_kind_conf_role_1(
@@ -389,55 +457,5 @@ mod tests {
             .unwrap();
 
         assert_eq!(result, expected);
-    }
-
-    #[test]
-    fn test_product_config_manager_merge_user_and_config_properties() {
-        let manager =
-            ProductConfigManager::from_yaml_file("data/test_product_config.yaml").unwrap();
-
-        /*
-        let mut user_config = HashMap::new();
-        user_config.insert(
-            ENV_INTEGER_PORT_MIN_MAX.to_string(),
-            Some("5000".to_string()),
-        );
-        user_config.insert(ENV_FLOAT.to_string(), Some("5.888".to_string()));
-        user_config.insert(
-            ENV_SSL_CERTIFICATE_PATH.to_string(),
-            Some("a/b/c".to_string()),
-        );
-         */
-
-        let mut expected = BTreeMap::new();
-        // vaild, expected
-        expected.insert(
-            ENV_INTEGER_PORT_MIN_MAX.to_string(),
-            Some("20000".to_string()),
-        );
-        // valid, expected
-        expected.insert(ENV_FLOAT.to_string(), Some("50.0".to_string()));
-        // expected
-        expected.insert(ENV_PROPERTY_STRING_DEPRECATED.to_string(), None);
-        //ENV_PROPERTY_STRING_DEPRECATED PropertyValidationResult::Error()
-        // required but no recommended or default value: expected
-        //ENV_SECURITY_PASSWORD PropertyValidationResult::Error()
-        // dependency of ENV_SECURITY_PASSWORD: not expected
-        //ENV_SECURITY true
-        // valid, expected
-        //ENV_SSL_CERTIFICATE_PATH "a/b/c"
-        // expected
-        //ENV_SSL_ENABLED "true"
-
-        let got = manager
-            .get_and_expand_properties(
-                &semver_parse(VERSION_0_5_0).unwrap(),
-                ROLE_1,
-                &PropertyNameKind::File(CONF_FILE.to_string()),
-                HashMap::new(),
-            )
-            .unwrap();
-
-        assert_eq!(expected, got);
     }
 }
