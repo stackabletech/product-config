@@ -5,6 +5,7 @@ use crate::types::{
 use crate::validation::ValidationResult;
 use semver::Version;
 use std::collections::HashMap;
+use std::hash::Hash;
 
 /// This is a helper method to merge SemVer errors and the product config errors. Since
 /// SemVer 1.0.X we can no longer use "thiserror" in combination with "#[from]" on the SemVer
@@ -19,8 +20,11 @@ pub(crate) fn semver_parse(version: &str) -> ValidationResult<Version> {
     }
 }
 
-pub(crate) fn hashmap_contains_any_key<K, V>(hm: &HashMap<K, V>, possible_keys: Vec<K>) -> bool {
-    for key in possible_keys {
+pub(crate) fn hashmap_contains_any_key<K, V>(hm: &HashMap<K, V>, possible_keys: Vec<K>) -> bool
+where
+    K: Hash + Eq,
+{
+    for key in &possible_keys {
         if hm.contains_key(key) {
             return true;
         }

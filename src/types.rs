@@ -77,13 +77,15 @@ impl PropertySpec {
         kind: &PropertyNameKind,
     ) -> Option<(String, Option<String>)> {
         if let Some(name) = self.name_from_kind(kind) {
-            if let Some(recommended_vals) = &self.recommended_values {
+            return if let Some(recommended_vals) = &self.recommended_values {
                 let val = self.filter_value(version, recommended_vals);
-                return Some((name, val));
+                Some((name, val))
             } else if let Some(default_vals) = &self.default_values {
                 let val = self.filter_value(version, default_vals);
-                return Some((name, val));
-            }
+                Some((name, val))
+            } else {
+                Some((name, None))
+            };
         }
         None
     }

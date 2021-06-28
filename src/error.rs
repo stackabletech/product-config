@@ -49,7 +49,7 @@ pub enum Error {
     },
 
     #[error("[{property_name}]: provided config value missing")]
-    PropertyValueMissing { property_name: PropertyName },
+    PropertyValueMissing { property_name: String },
 
     #[error("[{property_name}]: provided property value(s) missing for version '{version}'. Got: {property_values:?}")]
     PropertySpecValueMissingForVersion {

@@ -155,19 +155,47 @@ impl ProductConfigManager {
         let mut merged_properties = BTreeMap::new();
 
         for property in &self.config.properties {
-            if !property.has_role_required(role) {
-                continue;
-            }
+            // if user provides a property that may expand into other properties, we need to check that
+            // the roll matches and the expanded properties are supported (role and version match).
+            if util::hashmap_contains_any_key(&user_config, property.all_property_names())
+                && property.has_role(role)
+            {
+                if let Some(expands_to) = &property.expands_to {
+                    for dependency in expands_to {
+                        if !dependency.property.has_role(role) {
+                            continue;
+                        }
 
-            if !property.is_version_supported(version)? {
-                continue;
-            }
+                        if !dependency.property.is_version_supported(version)? {
+                            continue;
+                        }
 
-            if let Some((name, value)) = property.recommended_or_default(version, kind) {
-                merged_properties.insert(name, value);
-            }
+                        if let Some(name) = dependency.property.name_from_kind(kind) {
+                            if dependency.value.is_some() {
+                                merged_properties.insert(name, dependency.value.clone());
+                            } else if let Some((_, value)) =
+                                dependency.property.recommended_or_default(version, kind)
+                            {
+                                merged_properties.insert(name, value);
+                            }
+                        }
+                    }
+                }
+            // If the user does not provide a property that is required and expands into other properties
+            // we need to merge them
+            } else {
+                if !property.has_role_required(role) {
+                    continue;
+                }
 
-            if util::hashmap_contains_any_key(&user_config, property.all_property_names()) {
+                if !property.is_version_supported(version)? {
+                    continue;
+                }
+
+                if let Some((name, value)) = property.recommended_or_default(version, kind) {
+                    merged_properties.insert(name, value);
+                }
+
                 if let Some(expands_to) = &property.expands_to {
                     for dependency in expands_to {
                         if !dependency.property.has_role(role) {
@@ -212,17 +240,10 @@ impl ProductConfigManager {
         let mut result = BTreeMap::new();
 
         for (name, value) in merged_properties {
-            match value {
-                Some(val) => {
-                    let property = match self.look_up_property(&name, role, kind, version) {
-                        Some(property) => property,
-                        None => {
-                            result
-                                .insert(name, PropertyValidationResult::Override(val.to_string()));
-                            continue;
-                        }
-                    };
+            let temp = self.look_up_property(&name, role, kind, version);
 
+            match (temp, value) {
+                (Some(property), Some(val)) => {
                     let check_datatype = validation::check_datatype(&property, &name, &val);
                     if check_datatype.is_err() {
                         result.insert(
@@ -234,7 +255,6 @@ impl ProductConfigManager {
                         );
                         continue;
                     }
-
                     // TODO: deprecated check
 
                     // value is valid, check if it matches recommended or default values
@@ -268,14 +288,26 @@ impl ProductConfigManager {
                         PropertyValidationResult::Valid(val.to_string()),
                     );
                 }
-                None => {
-                    // TODO: we currently do not have nullable field in the spec; if we add this
-                    //    we can perform the nullable check here.
-                    result.insert(
-                        name.to_string(),
-                        PropertyValidationResult::Valid("".to_string()),
-                    );
+                // if required and not set -> error
+                (Some(property), None) => {
+                    if property.has_role_required(role) {
+                        result.insert(
+                            name.clone(),
+                            PropertyValidationResult::Error(
+                                "".to_string(),
+                                error::Error::PropertyValueMissing {
+                                    property_name: name,
+                                },
+                            ),
+                        );
+                    }
                 }
+                // override
+                (None, Some(val)) => {
+                    result.insert(name, PropertyValidationResult::Override(val.to_string()));
+                    continue;
+                }
+                _ => {}
             }
         }
 
@@ -459,10 +491,7 @@ mod tests {
         // valid, expected
         expected.insert(ENV_FLOAT.to_string(), Some("50.0".to_string()));
         // expected
-        expected.insert(
-            ENV_PROPERTY_STRING_DEPRECATED.to_string(),
-            Some("".to_string()),
-        );
+        expected.insert(ENV_PROPERTY_STRING_DEPRECATED.to_string(), None);
         //ENV_PROPERTY_STRING_DEPRECATED PropertyValidationResult::Error()
         // required but no recommended or default value: expected
         //ENV_SECURITY_PASSWORD PropertyValidationResult::Error()
