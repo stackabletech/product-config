@@ -425,6 +425,30 @@ mod tests {
             "ENV_ENABLE_PASSWORD".to_string() => Some("true".to_string()),
         }),
     )]
+    #[case::expands_role_required_expandee_role_required_no_user_input(
+        "0.5.0",
+        &PropertyNameKind::File("env.sh".to_string()),
+        "role_1",
+        "data/test_yamls/expands_role_required_expandee_role_required.yaml",
+        HashMap::new(),
+        macro_to_btree_map(collection!{
+            "ENV_PASSWORD".to_string() => None,
+            "ENV_ENABLE_PASSWORD".to_string() => None,
+        }),
+    )]
+    #[case::expands_role_required_expandee_role_required_with_user_input1(
+        "0.5.0",
+        &PropertyNameKind::File("env.sh".to_string()),
+        "role_1",
+        "data/test_yamls/expands_role_required_expandee_role_required.yaml",
+        macro_to_hash_map(collection!{
+            "ENV_PASSWORD".to_string() => Some("secret".to_string())
+        }),
+        macro_to_btree_map(collection!{
+            "ENV_PASSWORD".to_string() => Some("secret".to_string()),
+            "ENV_ENABLE_PASSWORD".to_string() => Some("true".to_string()),
+        }),
+    )]
     #[case::test_product_config_no_user_input(
         "0.5.0",
         &PropertyNameKind::File("env.sh".to_string()),
