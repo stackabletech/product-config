@@ -129,10 +129,10 @@ impl ProductConfigManager {
         // merge provided user properties with extracted property spec via role / kind and
         // dependencies to be validated later.
         let mut merged_properties = self
-            .get_and_expand_properties(&product_version, role, kind)
+            .get_and_expand_properties(&product_version, role, kind, user_config)
             .unwrap();
 
-        merged_properties.extend(user_config);
+        //merged_properties.extend(user_config);
 
         self.validate(&product_version, role, kind, merged_properties)
     }
@@ -150,6 +150,7 @@ impl ProductConfigManager {
         version: &Version,
         role: &str,
         kind: &PropertyNameKind,
+        user_config: HashMap<String, Option<String>>,
     ) -> ValidationResult<BTreeMap<String, Option<String>>> {
         let mut merged_properties = BTreeMap::new();
 
@@ -166,23 +167,25 @@ impl ProductConfigManager {
                 merged_properties.insert(name, value);
             }
 
-            if let Some(expands_to) = &property.expands_to {
-                for dependency in expands_to {
-                    if !dependency.property.has_role(role) {
-                        continue;
-                    }
+            if util::hashmap_contains_any_key(&user_config, property.all_property_names()) {
+                if let Some(expands_to) = &property.expands_to {
+                    for dependency in expands_to {
+                        if !dependency.property.has_role(role) {
+                            continue;
+                        }
 
-                    if !dependency.property.is_version_supported(version)? {
-                        continue;
-                    }
+                        if !dependency.property.is_version_supported(version)? {
+                            continue;
+                        }
 
-                    if let Some(name) = dependency.property.name_from_kind(kind) {
-                        if dependency.value.is_some() {
-                            merged_properties.insert(name, dependency.value.clone());
-                        } else if let Some((_, value)) =
-                            dependency.property.recommended_or_default(version, kind)
-                        {
-                            merged_properties.insert(name, value);
+                        if let Some(name) = dependency.property.name_from_kind(kind) {
+                            if dependency.value.is_some() {
+                                merged_properties.insert(name, dependency.value.clone());
+                            } else if let Some((_, value)) =
+                                dependency.property.recommended_or_default(version, kind)
+                            {
+                                merged_properties.insert(name, value);
+                            }
                         }
                     }
                 }
@@ -434,6 +437,7 @@ mod tests {
         let manager =
             ProductConfigManager::from_yaml_file("data/test_product_config.yaml").unwrap();
 
+        /*
         let mut user_config = HashMap::new();
         user_config.insert(
             ENV_INTEGER_PORT_MIN_MAX.to_string(),
@@ -444,15 +448,16 @@ mod tests {
             ENV_SSL_CERTIFICATE_PATH.to_string(),
             Some("a/b/c".to_string()),
         );
+         */
 
         let mut expected = BTreeMap::new();
         // vaild, expected
         expected.insert(
             ENV_INTEGER_PORT_MIN_MAX.to_string(),
-            Some("5000".to_string()),
+            Some("20000".to_string()),
         );
         // valid, expected
-        expected.insert(ENV_FLOAT.to_string(), Some("5.888".to_string()));
+        expected.insert(ENV_FLOAT.to_string(), Some("50.0".to_string()));
         // expected
         expected.insert(
             ENV_PROPERTY_STRING_DEPRECATED.to_string(),
@@ -473,6 +478,7 @@ mod tests {
                 &semver_parse(VERSION_0_5_0).unwrap(),
                 ROLE_1,
                 &PropertyNameKind::File(CONF_FILE.to_string()),
+                HashMap::new(),
             )
             .unwrap();
 

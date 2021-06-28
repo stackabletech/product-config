@@ -18,3 +18,12 @@ pub(crate) fn semver_parse(version: &str) -> ValidationResult<Version> {
         }),
     }
 }
+
+pub(crate) fn hashmap_contains_any_key<K, V>(hm: &HashMap<K, V>, possible_keys: Vec<K>) -> bool {
+    for key in possible_keys {
+        if hm.contains_key(key) {
+            return true;
+        }
+    }
+    false
+}

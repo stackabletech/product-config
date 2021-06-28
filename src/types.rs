@@ -160,6 +160,12 @@ impl PropertySpec {
                 .map(|property| property.name.clone()),
         )
     }
+    pub fn all_property_names(&self) -> Vec<String> {
+        self.property_names
+            .iter()
+            .map(|pn| pn.name.clone())
+            .collect()
+    }
 }
 
 /// Represents (one of multiple) unique identifier for a property name depending on the type
