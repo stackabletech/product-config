@@ -291,17 +291,17 @@ impl ProductConfigManager {
                 }
                 // if required and not set -> error
                 (Some(property), None) => {
-                    if property.has_role_required(role) {
-                        result.insert(
-                            name.clone(),
-                            PropertyValidationResult::Error(
-                                "".to_string(),
-                                error::Error::PropertyValueMissing {
-                                    property_name: name,
-                                },
-                            ),
-                        );
-                    }
+                    //if property.has_role_required(role) {
+                    result.insert(
+                        name.clone(),
+                        PropertyValidationResult::Error(
+                            "".to_string(),
+                            error::Error::PropertyValueMissing {
+                                property_name: name,
+                            },
+                        ),
+                    );
+                    //}
                 }
                 // override
                 (None, Some(val)) => {
@@ -358,6 +358,7 @@ mod tests {
     use std::collections::{BTreeMap, HashMap};
 
     use super::*;
+    use crate::error::Error;
     use crate::types::PropertyNameKind;
     use crate::util::semver_parse;
     use crate::ProductConfigManager;
@@ -370,6 +371,12 @@ mod tests {
     fn macro_to_btree_map(
         map: BTreeMap<String, Option<String>>,
     ) -> BTreeMap<String, Option<String>> {
+        map
+    }
+
+    fn macro_to_get_result(
+        map: BTreeMap<String, PropertyValidationResult>,
+    ) -> BTreeMap<String, PropertyValidationResult> {
         map
     }
 
@@ -512,6 +519,42 @@ mod tests {
         let result = manager
             .get_and_expand_properties(&product_version, role, kind, user_data)
             .unwrap();
+
+        assert_eq!(result, expected);
+    }
+
+    #[rstest]
+    #[case::validate(
+    &PropertyNameKind::File("env.sh".to_string()),
+    "role_1",
+    "data/test_yamls/validate.yaml",
+    HashMap::new(),
+    macro_to_get_result(collection!{
+        "ENV_FLOAT".to_string() => PropertyValidationResult::RecommendedDefault("50.0".to_string()),
+        "ENV_INTEGER_PORT_MIN_MAX".to_string() => PropertyValidationResult::RecommendedDefault("20000".to_string()),
+        "ENV_ENABLE_PASSWORD".to_string() => PropertyValidationResult::Valid("true".to_string()),
+        "ENV_PASSWORD".to_string() => PropertyValidationResult::Error("".to_string(), Error::PropertyValueMissing { property_name: "ENV_PASSWORD".to_string() }),
+        "ENV_ENABLE_PASSWORD".to_string() => PropertyValidationResult::Valid("true".to_string()),
+        "ENV_PROPERTY_STRING_DEPRECATED".to_string() => PropertyValidationResult::Error("".to_string(), Error::PropertyValueMissing { property_name: "ENV_PROPERTY_STRING_DEPRECATED".to_string() }),
+    })
+    )]
+    fn test_get(
+        #[case] kind: &PropertyNameKind,
+        #[case] role: &str,
+        #[case] path: &str,
+        #[case] user_data: HashMap<String, Option<String>>,
+        #[case] expected: BTreeMap<String, PropertyValidationResult>,
+    ) {
+        /*
+        "ENV_FLOAT".to_string() => Some("50.0".to_string()),
+        "ENV_INTEGER_PORT_MIN_MAX".to_string() => Some("20000".to_string()),
+        "ENV_PROPERTY_STRING_DEPRECATED".to_string() => None,
+        "ENV_PASSWORD".to_string() => None,
+        "ENV_ENABLE_PASSWORD".to_string() => Some("true".to_string()),
+         */
+        let manager = ProductConfigManager::from_yaml_file(path).unwrap();
+
+        let result = manager.get("0.5.0", role, kind, user_data);
 
         assert_eq!(result, expected);
     }
