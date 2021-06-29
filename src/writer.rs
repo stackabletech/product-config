@@ -53,7 +53,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::writer::{as_java_properties_string, write_java_properties, PropertiesWriterError};
+    use crate::writer::{to_java_properties_string, write_java_properties, PropertiesWriterError};
     use std::collections::{BTreeMap, HashMap};
 
     const PROPERTY_1: &str = "property";
@@ -71,7 +71,7 @@ mod tests {
         map.insert(PROPERTY_1.to_string(), Some(VALUE_OK.to_string()));
         map.insert(PROPERTY_2.to_string(), Some(VALUE_OK_2.to_string()));
 
-        let result = as_java_properties_string(map.iter())?;
+        let result = to_java_properties_string(map.iter())?;
 
         map.insert(PROPERTY_2.to_string(), Some(VALUE_OK_2_ESCAPED.to_string()));
         assert_eq!(result, calculate_result(map.iter()));
@@ -83,7 +83,7 @@ mod tests {
         let mut map = HashMap::new();
         map.insert(PROPERTY_1.to_string(), Some(VALUE_URL.to_string()));
 
-        let result = as_java_properties_string(map.iter())?;
+        let result = to_java_properties_string(map.iter())?;
 
         map.insert(PROPERTY_1.to_string(), Some(VALUE_URL_ESCAPED.to_string()));
         assert_eq!(result, calculate_result(map.iter()));
@@ -95,7 +95,7 @@ mod tests {
         let mut map = HashMap::new();
         map.insert(PROPERTY_1.to_string(), Some(UTF8_ERROR.to_string()));
 
-        let result = as_java_properties_string(map.iter());
+        let result = to_java_properties_string(map.iter());
         assert!(result.is_err());
     }
 
