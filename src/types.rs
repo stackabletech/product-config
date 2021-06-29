@@ -321,18 +321,3 @@ pub struct Role {
     pub required: bool,
     pub no_copy: Option<bool>,
 }
-
-#[cfg(test)]
-mod test {
-    use std::error::Error;
-    use std::fs;
-
-    use super::*;
-
-    #[test]
-    fn test_experiment_load_sample_product_config_via_serde() -> Result<(), Box<dyn Error>> {
-        let contents = fs::read_to_string("data/test_product_config.yaml")?;
-        let product_config: ProductConfig = serde_yaml::from_str(&contents)?;
-        Ok(())
-    }
-}

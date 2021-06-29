@@ -291,7 +291,7 @@ impl ProductConfigManager {
                     );
                 }
                 // if required and not set -> error
-                (Some(property), None) => {
+                (Some(_property), None) => {
                     //if property.has_role_required(role) {
                     result.insert(
                         name.clone(),
@@ -475,7 +475,7 @@ mod tests {
         "0.5.0",
         &PropertyNameKind::File("env.sh".to_string()),
         "role_1",
-        "data/test_product_config.yaml",
+        "data/test_yamls/test_product_config.yaml",
         HashMap::new(),
         macro_to_btree_map(collection!{
             "ENV_FLOAT".to_string() => Some("50.0".to_string()),
@@ -504,7 +504,6 @@ mod tests {
         HashMap::new(),
         BTreeMap::new(),
     )]
-    #[trace]
     fn test_get_and_expand_properties(
         #[case] version: &str,
         #[case] kind: &PropertyNameKind,
@@ -526,84 +525,166 @@ mod tests {
 
     #[rstest]
     #[case::get_no_user_input(
-    &PropertyNameKind::File("env.sh".to_string()),
-    "role_1",
-    "data/test_yamls/validate.yaml",
-    HashMap::new(),
-    macro_to_get_result(collection!{
-        "ENV_FLOAT".to_string() => PropertyValidationResult::RecommendedDefault("50.0".to_string()),
-        "ENV_INTEGER_PORT_MIN_MAX".to_string() => PropertyValidationResult::RecommendedDefault("20000".to_string()),
-        "ENV_ENABLE_PASSWORD".to_string() => PropertyValidationResult::Valid("true".to_string()),
-        "ENV_PASSWORD".to_string() => PropertyValidationResult::Error("".to_string(), Error::PropertyValueMissing { property_name: "ENV_PASSWORD".to_string() }),
-        "ENV_ENABLE_PASSWORD".to_string() => PropertyValidationResult::Valid("true".to_string()),
-        "ENV_PROPERTY_STRING_DEPRECATED".to_string() => PropertyValidationResult::Error("".to_string(), Error::PropertyValueMissing { property_name: "ENV_PROPERTY_STRING_DEPRECATED".to_string() }),
-    })
+        &PropertyNameKind::File("env.sh".to_string()),
+        "role_1",
+        "data/test_yamls/validate.yaml",
+        HashMap::new(),
+        macro_to_get_result(collection!{
+            "ENV_FLOAT".to_string() => PropertyValidationResult::RecommendedDefault("50.0".to_string()),
+            "ENV_INTEGER_PORT_MIN_MAX".to_string() => PropertyValidationResult::RecommendedDefault("20000".to_string()),
+            "ENV_ENABLE_PASSWORD".to_string() => PropertyValidationResult::Valid("true".to_string()),
+            "ENV_PASSWORD".to_string() => PropertyValidationResult::Error("".to_string(), Error::PropertyValueMissing { property_name: "ENV_PASSWORD".to_string() }),
+            "ENV_ENABLE_PASSWORD".to_string() => PropertyValidationResult::Valid("true".to_string()),
+            "ENV_PROPERTY_STRING_DEPRECATED".to_string() => PropertyValidationResult::Error("".to_string(), Error::PropertyValueMissing { property_name: "ENV_PROPERTY_STRING_DEPRECATED".to_string() }),
+        })
     )]
     #[case::get_valid_float(
-    &PropertyNameKind::File("env.sh".to_string()),
-    "role_1",
-    "data/test_yamls/validate.yaml",
-    macro_to_hash_map(collection!{
-        "ENV_FLOAT".to_string() => Some("42.0".to_string())
-    }),
-    macro_to_get_result(collection!{
-        "ENV_FLOAT".to_string() => PropertyValidationResult::Valid("42.0".to_string()),
-        "ENV_INTEGER_PORT_MIN_MAX".to_string() => PropertyValidationResult::RecommendedDefault("20000".to_string()),
-        "ENV_ENABLE_PASSWORD".to_string() => PropertyValidationResult::Valid("true".to_string()),
-        "ENV_PASSWORD".to_string() => PropertyValidationResult::Error("".to_string(), Error::PropertyValueMissing { property_name: "ENV_PASSWORD".to_string() }),
-        "ENV_ENABLE_PASSWORD".to_string() => PropertyValidationResult::Valid("true".to_string()),
-        "ENV_PROPERTY_STRING_DEPRECATED".to_string() => PropertyValidationResult::Error("".to_string(), Error::PropertyValueMissing { property_name: "ENV_PROPERTY_STRING_DEPRECATED".to_string() }),
-    })
+        &PropertyNameKind::File("env.sh".to_string()),
+        "role_1",
+        "data/test_yamls/validate_float.yaml",
+        macro_to_hash_map(collection!{
+            "ENV_FLOAT".to_string() => Some("42.0".to_string())
+        }),
+        macro_to_get_result(collection!{
+            "ENV_FLOAT".to_string() => PropertyValidationResult::Valid("42.0".to_string()),
+        })
     )]
-    #[case::get_invalid_float(
-    &PropertyNameKind::File("env.sh".to_string()),
-    "role_1",
-    "data/test_yamls/validate.yaml",
-    macro_to_hash_map(collection!{
-        "ENV_FLOAT".to_string() => Some("CAFE".to_string())
-    }),
-    macro_to_get_result(collection!{
-        "ENV_FLOAT".to_string() => PropertyValidationResult::Error("CAFE".to_string(), Error::DatatypeNotMatching { property_name: "ENV_FLOAT".to_string(), value: "CAFE".to_string(), datatype: "f64".to_string() }),
-        "ENV_INTEGER_PORT_MIN_MAX".to_string() => PropertyValidationResult::RecommendedDefault("20000".to_string()),
-        "ENV_ENABLE_PASSWORD".to_string() => PropertyValidationResult::Valid("true".to_string()),
-        "ENV_PASSWORD".to_string() => PropertyValidationResult::Error("".to_string(), Error::PropertyValueMissing { property_name: "ENV_PASSWORD".to_string() }),
-        "ENV_ENABLE_PASSWORD".to_string() => PropertyValidationResult::Valid("true".to_string()),
-        "ENV_PROPERTY_STRING_DEPRECATED".to_string() => PropertyValidationResult::Error("".to_string(), Error::PropertyValueMissing { property_name: "ENV_PROPERTY_STRING_DEPRECATED".to_string() }),
-    })
+    #[case::get_recommended_float_no_user_input(
+        &PropertyNameKind::File("env.sh".to_string()),
+        "role_1",
+        "data/test_yamls/validate_float.yaml",
+        HashMap::new(),
+        macro_to_get_result(collection!{
+            "ENV_FLOAT".to_string() => PropertyValidationResult::RecommendedDefault("50.0".to_string()),
+        })
+    )]
+    #[case::get_invalid_float_bad_user_value(
+        &PropertyNameKind::File("env.sh".to_string()),
+        "role_1",
+        "data/test_yamls/validate_float.yaml",
+        macro_to_hash_map(collection!{
+            "ENV_FLOAT".to_string() => Some("CAFE".to_string())
+        }),
+        macro_to_get_result(collection!{
+            "ENV_FLOAT".to_string() => PropertyValidationResult::Error("CAFE".to_string(), Error::DatatypeNotMatching { property_name: "ENV_FLOAT".to_string(), value: "CAFE".to_string(), datatype: "f64".to_string() }),
+        })
+    )]
+    #[case::get_invalid_float_user_value_too_small(
+        &PropertyNameKind::File("env.sh".to_string()),
+        "role_1",
+        "data/test_yamls/validate_float.yaml",
+        macro_to_hash_map(collection!{
+            "ENV_FLOAT".to_string() => Some("-1".to_string())
+        }),
+        macro_to_get_result(collection!{
+            "ENV_FLOAT".to_string() => PropertyValidationResult::Error("-1".to_string(), Error::PropertyValueOutOfBounds { property_name: "ENV_FLOAT".to_string(), received: "-1".to_string(), expected: "0".to_string() }),
+        })
+    )]
+    #[case::get_invalid_float_user_value_too_high(
+        &PropertyNameKind::File("env.sh".to_string()),
+        "role_1",
+        "data/test_yamls/validate_float.yaml",
+        macro_to_hash_map(collection!{
+            "ENV_FLOAT".to_string() => Some("101".to_string())
+        }),
+        macro_to_get_result(collection!{
+        "ENV_FLOAT".to_string() => PropertyValidationResult::Error("101".to_string(), Error::PropertyValueOutOfBounds { property_name: "ENV_FLOAT".to_string(), received: "101".to_string(), expected: "100".to_string() }),
+        })
     )]
     #[case::get_invalid_ssl_certificate_path(
-    &PropertyNameKind::File("env.sh".to_string()),
-    "role_1",
-    "data/test_yamls/validate.yaml",
-    macro_to_hash_map(collection!{
-        "ENV_SSL_CERTIFICATE_PATH".to_string() => Some("CAFE".to_string())
-    }),
-    macro_to_get_result(collection!{
-        "ENV_SSL_CERTIFICATE_PATH".to_string() => PropertyValidationResult::Error("CAFE".to_string(), Error::DatatypeRegexNotMatching { property_name: "ENV_SSL_CERTIFICATE_PATH".to_string(), value: "CAFE".to_string() }),
-        "ENV_FLOAT".to_string() => PropertyValidationResult::RecommendedDefault("50.0".to_string()),
-        "ENV_INTEGER_PORT_MIN_MAX".to_string() => PropertyValidationResult::RecommendedDefault("20000".to_string()),
-        "ENV_ENABLE_PASSWORD".to_string() => PropertyValidationResult::Valid("true".to_string()),
-        "ENV_PASSWORD".to_string() => PropertyValidationResult::Error("".to_string(), Error::PropertyValueMissing { property_name: "ENV_PASSWORD".to_string() }),
-        "ENV_ENABLE_PASSWORD".to_string() => PropertyValidationResult::Valid("true".to_string()),
-        "ENV_PROPERTY_STRING_DEPRECATED".to_string() => PropertyValidationResult::Error("".to_string(), Error::PropertyValueMissing { property_name: "ENV_PROPERTY_STRING_DEPRECATED".to_string() }),
-    })
+        &PropertyNameKind::Env,
+        "role_1",
+        "data/test_yamls/validate_directory.yaml",
+        macro_to_hash_map(collection!{
+            "ENV_SSL_CERTIFICATE_PATH".to_string() => Some("CAFE".to_string())
+        }),
+        macro_to_get_result(collection!{
+            "ENV_SSL_CERTIFICATE_PATH".to_string() => PropertyValidationResult::Error("CAFE".to_string(), Error::DatatypeRegexNotMatching { property_name: "ENV_SSL_CERTIFICATE_PATH".to_string(), value: "CAFE".to_string() }),
+        })
     )]
-    #[case::get_valid_ssl_certificate_path(
-    &PropertyNameKind::File("env.sh".to_string()),
-    "role_1",
-    "data/test_yamls/validate.yaml",
-    macro_to_hash_map(collection!{
-        "ENV_SSL_CERTIFICATE_PATH".to_string() => Some("/opt/stackable/zookeeper-operator/pki/host.pem".to_string())
-    }),
-    macro_to_get_result(collection!{
-        "ENV_SSL_CERTIFICATE_PATH".to_string() => PropertyValidationResult::Valid("/opt/stackable/zookeeper-operator/pki/host.pem".to_string()),
-        "ENV_FLOAT".to_string() => PropertyValidationResult::RecommendedDefault("50.0".to_string()),
-        "ENV_INTEGER_PORT_MIN_MAX".to_string() => PropertyValidationResult::RecommendedDefault("20000".to_string()),
-        "ENV_ENABLE_PASSWORD".to_string() => PropertyValidationResult::Valid("true".to_string()),
-        "ENV_PASSWORD".to_string() => PropertyValidationResult::Error("".to_string(), Error::PropertyValueMissing { property_name: "ENV_PASSWORD".to_string() }),
-        "ENV_ENABLE_PASSWORD".to_string() => PropertyValidationResult::Valid("true".to_string()),
-        "ENV_PROPERTY_STRING_DEPRECATED".to_string() => PropertyValidationResult::Error("".to_string(), Error::PropertyValueMissing { property_name: "ENV_PROPERTY_STRING_DEPRECATED".to_string() }),
-    })
+    #[case::get_valid_default_certificate_path_no_user_input(
+        &PropertyNameKind::Env,
+        "role_1",
+        "data/test_yamls/validate_directory.yaml",
+        HashMap::new(),
+        macro_to_get_result(collection!{
+            "ENV_SSL_CERTIFICATE_PATH".to_string() => PropertyValidationResult::Default("path/to/certificates".to_string()),
+        })
+    )]
+    #[case::get_override_ssl_certificate_path(
+        &PropertyNameKind::File("should_not_be_found_therefore_is_an_override".to_string()),
+        "role_1",
+        "data/test_yamls/validate_directory.yaml",
+        macro_to_hash_map(collection!{
+            "ENV_SSL_CERTIFICATE_PATH".to_string() => Some("/opt/stackable/zookeeper-operator/pki".to_string())
+        }),
+        macro_to_get_result(collection!{
+            "ENV_SSL_CERTIFICATE_PATH".to_string() => PropertyValidationResult::Override("/opt/stackable/zookeeper-operator/pki".to_string()),
+        })
+    )]
+    #[case::get_override_ssl_certificate_path(
+        &PropertyNameKind::Env,
+        "role_1",
+        "data/test_yamls/validate_directory.yaml",
+        macro_to_hash_map(collection!{
+            "ENV_SSL_CERTIFICATE_PATH".to_string() => Some("/opt/stackable/zookeeper-operator/pki".to_string())
+        }),
+        macro_to_get_result(collection!{
+            "ENV_SSL_CERTIFICATE_PATH".to_string() => PropertyValidationResult::Valid("/opt/stackable/zookeeper-operator/pki".to_string()),
+        })
+    )]
+    #[case::get_recommended_port_no_user_input(
+        &PropertyNameKind::Env,
+        "role_1",
+        "data/test_yamls/validate_port.yaml",
+        HashMap::new(),
+        macro_to_get_result(collection!{
+            "ENV_INTEGER_PORT_MIN_MAX".to_string() => PropertyValidationResult::RecommendedDefault("20000".to_string()),
+        })
+    )]
+    #[case::get_port_user_value_too_small(
+        &PropertyNameKind::Env,
+        "role_1",
+        "data/test_yamls/validate_port.yaml",
+        macro_to_hash_map(collection!{
+            "ENV_INTEGER_PORT_MIN_MAX".to_string() => Some("42".to_string())
+        }),
+        macro_to_get_result(collection!{
+            "ENV_INTEGER_PORT_MIN_MAX".to_string() => PropertyValidationResult::Error("42".to_string(), Error::PropertyValueOutOfBounds { property_name: "ENV_INTEGER_PORT_MIN_MAX".to_string(), received: "42".to_string(), expected: "1024".to_string() })
+        })
+    )]
+    #[case::get_port_user_value_too_high(
+        &PropertyNameKind::Env,
+        "role_1",
+        "data/test_yamls/validate_port.yaml",
+        macro_to_hash_map(collection!{
+            "ENV_INTEGER_PORT_MIN_MAX".to_string() => Some("65536".to_string())
+        }),
+        macro_to_get_result(collection!{
+        "ENV_INTEGER_PORT_MIN_MAX".to_string() => PropertyValidationResult::Error("65536".to_string(), Error::PropertyValueOutOfBounds { property_name: "ENV_INTEGER_PORT_MIN_MAX".to_string(), received: "65536".to_string(), expected: "65535".to_string() })
+        })
+    )]
+    #[case::get_port_user_value_invalid(
+        &PropertyNameKind::Env,
+        "role_1",
+        "data/test_yamls/validate_port.yaml",
+        macro_to_hash_map(collection!{
+            "ENV_INTEGER_PORT_MIN_MAX".to_string() => Some("invalid".to_string())
+        }),
+        macro_to_get_result(collection!{
+            "ENV_INTEGER_PORT_MIN_MAX".to_string() => PropertyValidationResult::Error("invalid".to_string(), Error::DatatypeNotMatching { property_name: "ENV_INTEGER_PORT_MIN_MAX".to_string(), value: "invalid".to_string(), datatype: "i64".to_string() })
+        })
+    )]
+    #[case::get_port_user_value_valid(
+        &PropertyNameKind::Env,
+        "role_1",
+        "data/test_yamls/validate_port.yaml",
+        macro_to_hash_map(collection!{
+            "ENV_INTEGER_PORT_MIN_MAX".to_string() => Some("1024".to_string()),
+        }),
+        macro_to_get_result(collection!{
+            "ENV_INTEGER_PORT_MIN_MAX".to_string() => PropertyValidationResult::Valid("1024".to_string()),
+        })
     )]
     fn test_get(
         #[case] kind: &PropertyNameKind,
