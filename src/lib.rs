@@ -89,10 +89,9 @@ impl ProductConfigManager {
         })
     }
 
-    /// Retrieve and check config properties depending on the kind (e.g. env, conf),
-    /// the required config file (e.g. environment variables or config properties).
-    /// Add other provided properties that match the config kind, config file and config role.
-    /// Automatically add and correct missing or wrong config properties and dependencies.
+    /// This function merges the user provided configuration properties with the product configuration
+    /// and validates the result, both in a single step. The caller is expected to look at each
+    /// [PropertyValidationResult] and take the appropriate action based on the product requirements.
     ///
     /// # Arguments
     ///
@@ -104,26 +103,22 @@ impl ProductConfigManager {
     /// # Examples
     ///
     /// ```
-    /// use product_config::reader::ConfigJsonReader;
     /// use product_config::types::PropertyNameKind;
-    /// use product_config::ProductConfigSpec;
+    /// use product_config::ProductConfigManager;
     /// use std::collections::HashMap;
     ///
-    /// let config = ProductConfigSpec::new(ConfigJsonReader::new(
-    ///     "data/test_config_spec.json",
-    ///     "data/test_property_spec.json",
-    ///   )
-    /// ).unwrap();
+    /// let config = ProductConfigManager::from_yaml_file("data/product_configuration.yaml")
+    ///     .unwrap();
     ///
     /// let mut user_data = HashMap::new();
-    /// user_data.insert("ENV_INTEGER_PORT_MIN_MAX".to_string(), "12345".to_string());
-    /// user_data.insert("ENV_PROPERTY_STRING_MEMORY".to_string(), "1g".to_string());
+    /// user_data.insert("ENV_INTEGER_PORT_MIN_MAX".to_string(), Some("12345".to_string()));
+    /// user_data.insert("ENV_PROPERTY_STRING_MEMORY".to_string(), Some("1g".to_string()));
     ///
     /// let env_sh = config.get(
     ///     "0.5.0",
     ///     "role_1",
     ///     &PropertyNameKind::File("env.sh".to_string()),
-    ///     &user_data,
+    ///     user_data,
     /// );
     /// ```
     pub fn get(
@@ -146,15 +141,20 @@ impl ProductConfigManager {
         self.validate(&product_version, role, kind, merged_properties)
     }
 
-    /// Merge provided user config properties and available property spec (from JSON, YAML...)
-    /// depending on kind and role to be validated later.
+    /// Merge the provided user config properties with the product configuration (loaded from YAML)
+    /// depending on kind, role and version. The user configuration has the highest priority, followed
+    /// by the recommended values from the product configuration. Finally, if none are available,
+    /// the default values from the product configuration are used.
+    /// This function also expands properties if they are required for the given role or if the user
+    /// has requested so in the [user_config] parameter.
+    ///
     ///
     /// # Arguments
     ///
     /// * `version` - the current product version
     /// * `role` - property role provided by the user
     /// * `kind` - property name kind provided by the user
-    pub fn get_and_expand_properties(
+    pub(crate) fn get_and_expand_properties(
         &self,
         version: &Version,
         role: &str,
@@ -194,14 +194,20 @@ impl ProductConfigManager {
         Ok(merged_properties)
     }
 
-    /// Returns the provided property_value if no validation errors appear
+    /// Validates the given [merged_properties] by performing the following actions:
+    /// * syntax checks on the values
+    /// * mandatory checks (if a property is required for the given role and version)
+    /// * comparison checks against the recommended and default values
+    ///
+    /// Properties that are not found in the product configuration are considered to be
+    /// user "overrides".
     ///
     /// # Arguments
     /// * `version` - the current product version
     /// * `role` - property role provided by the user
     /// * `kind` - property name kind provided by the user
     /// * `merged_properties` - merged user and property spec (matching role, kind etc.)
-    pub fn validate(
+    pub(crate) fn validate(
         &self,
         version: &Version,
         role: &str,
@@ -285,7 +291,7 @@ impl ProductConfigManager {
         result
     }
 
-    pub fn look_up_property(
+    fn look_up_property(
         &self,
         name: &str,
         role: &str,
@@ -378,8 +384,7 @@ mod tests {
         "data/test_yamls/expands_role_required_expandee_role_not_required.yaml",
         HashMap::new(),
         macro_to_btree_map(collection!{
-            "ENV_PASSWORD".to_string() => Some("secret".to_string()),
-            "ENV_ENABLE_PASSWORD".to_string() => Some("true".to_string())
+            "ENV_PASSWORD".to_string() => None,
         }),
     )]
     #[case::expands_role_not_required_expandee_role_not_required_no_user_input(
