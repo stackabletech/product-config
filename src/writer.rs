@@ -17,7 +17,7 @@ pub enum PropertiesWriterError {
 ///
 /// The behavior is based on https://docs.oracle.com/javase/7/docs/api/java/util/Properties.html
 /// and is adapted to "java.util.Properties" if ambiguous or incomplete.
-pub fn create_java_properties<'a, T>(properties: T) -> Result<String, PropertiesWriterError>
+pub fn to_java_properties_string<'a, T>(properties: T) -> Result<String, PropertiesWriterError>
 where
     T: Iterator<Item = (&'a String, &'a Option<String>)>,
 {
@@ -53,7 +53,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::writer::{create_java_properties, write_java_properties, PropertiesWriterError};
+    use crate::writer::{as_java_properties_string, write_java_properties, PropertiesWriterError};
     use std::collections::{BTreeMap, HashMap};
 
     const PROPERTY_1: &str = "property";
@@ -71,7 +71,7 @@ mod tests {
         map.insert(PROPERTY_1.to_string(), Some(VALUE_OK.to_string()));
         map.insert(PROPERTY_2.to_string(), Some(VALUE_OK_2.to_string()));
 
-        let result = create_java_properties(map.iter())?;
+        let result = as_java_properties_string(map.iter())?;
 
         map.insert(PROPERTY_2.to_string(), Some(VALUE_OK_2_ESCAPED.to_string()));
         assert_eq!(result, calculate_result(map.iter()));
@@ -83,7 +83,7 @@ mod tests {
         let mut map = HashMap::new();
         map.insert(PROPERTY_1.to_string(), Some(VALUE_URL.to_string()));
 
-        let result = create_java_properties(map.iter())?;
+        let result = as_java_properties_string(map.iter())?;
 
         map.insert(PROPERTY_1.to_string(), Some(VALUE_URL_ESCAPED.to_string()));
         assert_eq!(result, calculate_result(map.iter()));
@@ -95,7 +95,7 @@ mod tests {
         let mut map = HashMap::new();
         map.insert(PROPERTY_1.to_string(), Some(UTF8_ERROR.to_string()));
 
-        let result = create_java_properties(map.iter());
+        let result = as_java_properties_string(map.iter());
         assert!(result.is_err());
     }
 
