@@ -52,6 +52,7 @@ impl ops::Deref for PropertyAnchor {
 pub struct PropertySpec {
     pub property_names: Vec<PropertyName>,
     pub datatype: Datatype,
+    pub roles: Vec<Role>,
     pub as_of_version: String,
     pub default_values: Option<Vec<PropertyValueSpec>>,
     pub recommended_values: Option<Vec<PropertyValueSpec>>,
@@ -59,7 +60,6 @@ pub struct PropertySpec {
     pub deprecated_since: Option<String>,
     pub deprecated_for: Option<Vec<String>>,
     pub expands_to: Option<Vec<PropertyDependency>>,
-    pub roles: Option<Vec<Role>>,
     pub restart_required: Option<bool>,
     pub tags: Option<Vec<String>>,
     pub additional_doc: Option<Vec<String>>,
@@ -119,8 +119,19 @@ impl PropertySpec {
         None
     }
 
+    pub fn has_role_no_copy(&self, user_role: &str) -> bool {
+        if let roles = &self.roles {
+            for role in roles {
+                if role.name == user_role && role.no_copy == Some(true) {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
     pub fn has_role_required(&self, user_role: &str) -> bool {
-        if let Some(roles) = &self.roles {
+        if let roles = &self.roles {
             for role in roles {
                 if role.name == user_role && role.required {
                     return true;
@@ -131,7 +142,7 @@ impl PropertySpec {
     }
 
     pub fn has_role(&self, user_role: &str) -> bool {
-        if let Some(roles) = &self.roles {
+        if let roles = &self.roles {
             for role in roles {
                 if role.name == user_role {
                     return true;
@@ -314,6 +325,7 @@ pub struct PropertyDependency {
 pub struct Role {
     pub name: String,
     pub required: bool,
+    pub no_copy: Option<bool>,
 }
 
 #[cfg(test)]

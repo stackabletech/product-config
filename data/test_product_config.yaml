@@ -240,6 +240,7 @@ properties:
       roles:
         - name: "role_1"
           required: false
+          noCopy: true
       datatype:
         type: "bool"
       asOfVersion: "0.5.0"

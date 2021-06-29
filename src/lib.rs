@@ -102,7 +102,7 @@ impl ProductConfigManager {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```no_run
     /// use product_config::types::PropertyNameKind;
     /// use product_config::ProductConfigManager;
     /// use std::collections::HashMap;
@@ -191,7 +191,30 @@ impl ProductConfigManager {
 
         merged_properties.extend(user_config);
 
-        Ok(merged_properties)
+        // remove no_copy elements
+
+        Ok(self.remove_no_copy_properties(version, role, kind, &merged_properties))
+    }
+
+    fn remove_no_copy_properties(
+        &self,
+        version: &Version,
+        role: &str,
+        kind: &PropertyNameKind,
+        properties: &BTreeMap<String, Option<String>>,
+    ) -> BTreeMap<String, Option<String>> {
+        let mut result = BTreeMap::new();
+
+        for (name, value) in properties {
+            if let Some(prop) = self.find_property(&name, role, kind, version) {
+                if prop.has_role_no_copy(role) {
+                    continue;
+                }
+            }
+            result.insert(name.clone(), value.clone());
+        }
+
+        result
     }
 
     /// Validates the given [merged_properties] by performing the following actions:
@@ -217,7 +240,7 @@ impl ProductConfigManager {
         let mut result = BTreeMap::new();
 
         for (name, value) in merged_properties {
-            let prop = self.look_up_property(&name, role, kind, version);
+            let prop = self.find_property(&name, role, kind, version);
 
             match (prop, value) {
                 (Some(property), Some(val)) => {
@@ -233,6 +256,7 @@ impl ProductConfigManager {
                         continue;
                     }
                     // TODO: deprecated check
+                    // TODO: allowedValues
 
                     // value is valid, check if it matches recommended or default values
                     // was provided by recommended value?
@@ -291,7 +315,7 @@ impl ProductConfigManager {
         result
     }
 
-    fn look_up_property(
+    fn find_property(
         &self,
         name: &str,
         role: &str,
@@ -385,6 +409,7 @@ mod tests {
         HashMap::new(),
         macro_to_btree_map(collection!{
             "ENV_PASSWORD".to_string() => None,
+            "ENV_ENABLE_PASSWORD".to_string() => Some("true".to_string())
         }),
     )]
     #[case::expands_role_not_required_expandee_role_not_required_no_user_input(
@@ -438,7 +463,7 @@ mod tests {
         HashMap::new(),
         macro_to_btree_map(collection!{
             "ENV_PASSWORD".to_string() => None,
-            "ENV_ENABLE_PASSWORD".to_string() => None,
+            "ENV_ENABLE_PASSWORD".to_string() => Some("true".to_string()),
         }),
     )]
     #[case::expands_role_required_expandee_role_required_with_user_input1(
@@ -465,11 +490,30 @@ mod tests {
             "ENV_INTEGER_PORT_MIN_MAX".to_string() => Some("20000".to_string()),
             "ENV_PROPERTY_STRING_DEPRECATED".to_string() => None,
             "ENV_PASSWORD".to_string() => None,
-            "ENV_ENABLE_PASSWORD".to_string() => None,
+            "ENV_ENABLE_PASSWORD".to_string() => Some("true".to_string()),
     }),
     )]
+    #[case::expands_role_required_no_copy_no_user_input(
+        "0.5.0",
+        &PropertyNameKind::File("env.sh".to_string()),
+        "role_1",
+        "data/test_yamls/expands_role_required_no_copy.yaml",
+        HashMap::new(),
+        macro_to_btree_map(collection!{
+            "ENV_SSL_CERTIFICATE_PATH".to_string() => Some("path/to/certificates".to_string()),
+            "ENV_SSL_ENABLED".to_string() => Some("true".to_string()),
+    }),
+    )]
+    #[case::expands_role_not_required_no_copy_no_user_input(
+        "0.5.0",
+        &PropertyNameKind::File("env.sh".to_string()),
+        "role_1",
+        "data/test_yamls/expands_role_not_required_no_copy.yaml",
+        HashMap::new(),
+        BTreeMap::new(),
+    )]
     #[trace]
-    fn test_get_kind_conf_role_1(
+    fn test_get_and_expand_properties(
         #[case] version: &str,
         #[case] kind: &PropertyNameKind,
         #[case] role: &str,
