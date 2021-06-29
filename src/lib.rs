@@ -164,9 +164,10 @@ impl ProductConfigManager {
         let mut merged_properties = BTreeMap::new();
 
         for property in &self.config.properties {
+            let property_names = property.all_property_names();
             // if user provides a property that may expand into other properties, we need to check that
             // the roll matches and the expanded properties are supported (role and version match).
-            if util::hashmap_contains_any_key(&user_config, property.all_property_names())
+            if util::hashmap_contains_any_key(&user_config, &property_names)
                 && property.has_role(role)
             {
                 merged_properties.extend(expand_properties(property, version, role, kind)?);
@@ -524,12 +525,78 @@ mod tests {
     }
 
     #[rstest]
-    #[case::validate(
+    #[case::get_no_user_input(
     &PropertyNameKind::File("env.sh".to_string()),
     "role_1",
     "data/test_yamls/validate.yaml",
     HashMap::new(),
     macro_to_get_result(collection!{
+        "ENV_FLOAT".to_string() => PropertyValidationResult::RecommendedDefault("50.0".to_string()),
+        "ENV_INTEGER_PORT_MIN_MAX".to_string() => PropertyValidationResult::RecommendedDefault("20000".to_string()),
+        "ENV_ENABLE_PASSWORD".to_string() => PropertyValidationResult::Valid("true".to_string()),
+        "ENV_PASSWORD".to_string() => PropertyValidationResult::Error("".to_string(), Error::PropertyValueMissing { property_name: "ENV_PASSWORD".to_string() }),
+        "ENV_ENABLE_PASSWORD".to_string() => PropertyValidationResult::Valid("true".to_string()),
+        "ENV_PROPERTY_STRING_DEPRECATED".to_string() => PropertyValidationResult::Error("".to_string(), Error::PropertyValueMissing { property_name: "ENV_PROPERTY_STRING_DEPRECATED".to_string() }),
+    })
+    )]
+    #[case::get_valid_float(
+    &PropertyNameKind::File("env.sh".to_string()),
+    "role_1",
+    "data/test_yamls/validate.yaml",
+    macro_to_hash_map(collection!{
+        "ENV_FLOAT".to_string() => Some("42.0".to_string())
+    }),
+    macro_to_get_result(collection!{
+        "ENV_FLOAT".to_string() => PropertyValidationResult::Valid("42.0".to_string()),
+        "ENV_INTEGER_PORT_MIN_MAX".to_string() => PropertyValidationResult::RecommendedDefault("20000".to_string()),
+        "ENV_ENABLE_PASSWORD".to_string() => PropertyValidationResult::Valid("true".to_string()),
+        "ENV_PASSWORD".to_string() => PropertyValidationResult::Error("".to_string(), Error::PropertyValueMissing { property_name: "ENV_PASSWORD".to_string() }),
+        "ENV_ENABLE_PASSWORD".to_string() => PropertyValidationResult::Valid("true".to_string()),
+        "ENV_PROPERTY_STRING_DEPRECATED".to_string() => PropertyValidationResult::Error("".to_string(), Error::PropertyValueMissing { property_name: "ENV_PROPERTY_STRING_DEPRECATED".to_string() }),
+    })
+    )]
+    #[case::get_invalid_float(
+    &PropertyNameKind::File("env.sh".to_string()),
+    "role_1",
+    "data/test_yamls/validate.yaml",
+    macro_to_hash_map(collection!{
+        "ENV_FLOAT".to_string() => Some("CAFE".to_string())
+    }),
+    macro_to_get_result(collection!{
+        "ENV_FLOAT".to_string() => PropertyValidationResult::Error("CAFE".to_string(), Error::DatatypeNotMatching { property_name: "ENV_FLOAT".to_string(), value: "CAFE".to_string(), datatype: "f64".to_string() }),
+        "ENV_INTEGER_PORT_MIN_MAX".to_string() => PropertyValidationResult::RecommendedDefault("20000".to_string()),
+        "ENV_ENABLE_PASSWORD".to_string() => PropertyValidationResult::Valid("true".to_string()),
+        "ENV_PASSWORD".to_string() => PropertyValidationResult::Error("".to_string(), Error::PropertyValueMissing { property_name: "ENV_PASSWORD".to_string() }),
+        "ENV_ENABLE_PASSWORD".to_string() => PropertyValidationResult::Valid("true".to_string()),
+        "ENV_PROPERTY_STRING_DEPRECATED".to_string() => PropertyValidationResult::Error("".to_string(), Error::PropertyValueMissing { property_name: "ENV_PROPERTY_STRING_DEPRECATED".to_string() }),
+    })
+    )]
+    #[case::get_invalid_ssl_certificate_path(
+    &PropertyNameKind::File("env.sh".to_string()),
+    "role_1",
+    "data/test_yamls/validate.yaml",
+    macro_to_hash_map(collection!{
+        "ENV_SSL_CERTIFICATE_PATH".to_string() => Some("CAFE".to_string())
+    }),
+    macro_to_get_result(collection!{
+        "ENV_SSL_CERTIFICATE_PATH".to_string() => PropertyValidationResult::Error("CAFE".to_string(), Error::DatatypeRegexNotMatching { property_name: "ENV_SSL_CERTIFICATE_PATH".to_string(), value: "CAFE".to_string() }),
+        "ENV_FLOAT".to_string() => PropertyValidationResult::RecommendedDefault("50.0".to_string()),
+        "ENV_INTEGER_PORT_MIN_MAX".to_string() => PropertyValidationResult::RecommendedDefault("20000".to_string()),
+        "ENV_ENABLE_PASSWORD".to_string() => PropertyValidationResult::Valid("true".to_string()),
+        "ENV_PASSWORD".to_string() => PropertyValidationResult::Error("".to_string(), Error::PropertyValueMissing { property_name: "ENV_PASSWORD".to_string() }),
+        "ENV_ENABLE_PASSWORD".to_string() => PropertyValidationResult::Valid("true".to_string()),
+        "ENV_PROPERTY_STRING_DEPRECATED".to_string() => PropertyValidationResult::Error("".to_string(), Error::PropertyValueMissing { property_name: "ENV_PROPERTY_STRING_DEPRECATED".to_string() }),
+    })
+    )]
+    #[case::get_valid_ssl_certificate_path(
+    &PropertyNameKind::File("env.sh".to_string()),
+    "role_1",
+    "data/test_yamls/validate.yaml",
+    macro_to_hash_map(collection!{
+        "ENV_SSL_CERTIFICATE_PATH".to_string() => Some("/opt/stackable/zookeeper-operator/pki/host.pem".to_string())
+    }),
+    macro_to_get_result(collection!{
+        "ENV_SSL_CERTIFICATE_PATH".to_string() => PropertyValidationResult::Valid("/opt/stackable/zookeeper-operator/pki/host.pem".to_string()),
         "ENV_FLOAT".to_string() => PropertyValidationResult::RecommendedDefault("50.0".to_string()),
         "ENV_INTEGER_PORT_MIN_MAX".to_string() => PropertyValidationResult::RecommendedDefault("20000".to_string()),
         "ENV_ENABLE_PASSWORD".to_string() => PropertyValidationResult::Valid("true".to_string()),
@@ -545,13 +612,6 @@ mod tests {
         #[case] user_data: HashMap<String, Option<String>>,
         #[case] expected: BTreeMap<String, PropertyValidationResult>,
     ) {
-        /*
-        "ENV_FLOAT".to_string() => Some("50.0".to_string()),
-        "ENV_INTEGER_PORT_MIN_MAX".to_string() => Some("20000".to_string()),
-        "ENV_PROPERTY_STRING_DEPRECATED".to_string() => None,
-        "ENV_PASSWORD".to_string() => None,
-        "ENV_ENABLE_PASSWORD".to_string() => Some("true".to_string()),
-         */
         let manager = ProductConfigManager::from_yaml_file(path).unwrap();
 
         let result = manager.get("0.5.0", role, kind, user_data);
