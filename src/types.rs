@@ -120,33 +120,27 @@ impl PropertySpec {
     }
 
     pub fn has_role_no_copy(&self, user_role: &str) -> bool {
-        if let roles = &self.roles {
-            for role in roles {
-                if role.name == user_role && role.no_copy == Some(true) {
-                    return true;
-                }
+        for role in &self.roles {
+            if role.name == user_role && role.no_copy == Some(true) {
+                return true;
             }
         }
         false
     }
 
     pub fn has_role_required(&self, user_role: &str) -> bool {
-        if let roles = &self.roles {
-            for role in roles {
-                if role.name == user_role && role.required {
-                    return true;
-                }
+        for role in &self.roles {
+            if role.name == user_role && role.required {
+                return true;
             }
         }
         false
     }
 
     pub fn has_role(&self, user_role: &str) -> bool {
-        if let roles = &self.roles {
-            for role in roles {
-                if role.name == user_role {
-                    return true;
-                }
+        for role in &self.roles {
+            if role.name == user_role {
+                return true;
             }
         }
         false

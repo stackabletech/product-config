@@ -134,7 +134,7 @@ impl ProductConfigManager {
 
         // merge provided user properties with extracted property spec via role / kind and
         // dependencies to be validated later.
-        let mut merged_properties = self
+        let merged_properties = self
             .get_and_expand_properties(&product_version, role, kind, user_config)
             .unwrap();
 
@@ -362,22 +362,6 @@ mod tests {
     use crate::util::semver_parse;
     use crate::ProductConfigManager;
     use rstest::*;
-    use std::hash::Hash;
-
-    const ENV_INTEGER_PORT_MIN_MAX: &str = "ENV_INTEGER_PORT_MIN_MAX";
-
-    const ENV_FLOAT: &str = "ENV_FLOAT";
-    //const ENV_PROPERTY_STRING_MEMORY: &str = "ENV_PROPERTY_STRING_MEMORY";
-    const ENV_PROPERTY_STRING_DEPRECATED: &str = "ENV_PROPERTY_STRING_DEPRECATED";
-    //const ENV_ALLOWED_VALUES: &str = "ENV_ALLOWED_VALUES";
-    //const ENV_SECURITY: &str = "ENV_SECURITY";
-    //const ENV_SECURITY_PASSWORD: &str = "ENV_SECURITY_PASSWORD";
-    const ENV_SSL_ENABLED: &str = "ENV_SSL_ENABLED";
-    const ENV_SSL_CERTIFICATE_PATH: &str = "ENV_SSL_CERTIFICATE_PATH";
-
-    const ROLE_1: &str = "role_1";
-    const VERSION_0_5_0: &str = "0.5.0";
-    const CONF_FILE: &str = "env.sh";
 
     fn macro_to_hash_map(map: HashMap<String, Option<String>>) -> HashMap<String, Option<String>> {
         map
