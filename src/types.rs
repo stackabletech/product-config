@@ -59,7 +59,7 @@ pub struct PropertySpec {
     pub allowed_values: Option<Vec<String>>,
     pub deprecated_since: Option<String>,
     pub deprecated_for: Option<Vec<String>>,
-    pub expands_to: Option<Vec<PropertyDependency>>,
+    pub expands_to: Option<Vec<PropertyExpansion>>,
     pub restart_required: Option<bool>,
     pub tags: Option<Vec<String>>,
     pub additional_doc: Option<Vec<String>>,
@@ -68,6 +68,8 @@ pub struct PropertySpec {
 }
 
 impl PropertySpec {
+    /// Extract the (preferred) recommended or default value from the property that matches
+    /// the provided version.
     pub fn recommended_or_default(
         &self,
         version: &Version,
@@ -87,6 +89,8 @@ impl PropertySpec {
         None
     }
 
+    /// Filters a recommended or default [`PropertyValueSpec`] to match the provided version
+    /// via its to and from range.
     pub fn filter_value(&self, version: &Version, values: &[PropertyValueSpec]) -> Option<String> {
         for value in values {
             if let Some(from) = &value.from_version {
@@ -110,6 +114,8 @@ impl PropertySpec {
         None
     }
 
+    /// Returns the property name by matching the provided kind. There should be only one reference
+    /// to CLI and ENV, as well as multiple references to FILE(s) with different names.
     pub fn name_from_kind(&self, kind: &PropertyNameKind) -> Option<String> {
         for name in &self.property_names {
             if name.kind == *kind {
@@ -119,6 +125,7 @@ impl PropertySpec {
         None
     }
 
+    /// Returns true if the role matches and no_copy is set to true.
     pub fn has_role_no_copy(&self, user_role: &str) -> bool {
         for role in &self.roles {
             if role.name == user_role && role.no_copy == Some(true) {
@@ -128,6 +135,7 @@ impl PropertySpec {
         false
     }
 
+    /// Returns true if the role matches is required.
     pub fn has_role_required(&self, user_role: &str) -> bool {
         for role in &self.roles {
             if role.name == user_role && role.required {
@@ -137,6 +145,7 @@ impl PropertySpec {
         false
     }
 
+    /// Returns true if the role matches.
     pub fn has_role(&self, user_role: &str) -> bool {
         for role in &self.roles {
             if role.name == user_role {
@@ -146,10 +155,12 @@ impl PropertySpec {
         false
     }
 
+    /// Returns true if the product_version is greater or equal the as_of_version of the property.
     pub fn is_version_supported(&self, product_version: &Version) -> ValidationResult<bool> {
         Ok(semver_parse(&self.as_of_version)? <= *product_version)
     }
 
+    /// Returns true if the product_version is greater or equal the deprecated_since of the property.
     pub fn is_version_deprecated(&self, product_version: &Version) -> ValidationResult<bool> {
         if let Some(deprecated_since) = &self.deprecated_since {
             return Ok(semver_parse(deprecated_since)? <= *product_version);
@@ -157,6 +168,7 @@ impl PropertySpec {
         Ok(false)
     }
 
+    /// Returns all known property names.
     pub fn all_property_names(&self) -> Vec<String> {
         self.property_names
             .iter()
@@ -304,11 +316,11 @@ pub enum Datatype {
     },
 }
 
-/// Represents a dependency on another config property and (if available) a required value
+/// Represents an expansion on another config property and (if available) a required value
 /// e.g. to set ssl certificates one has to set some property use_ssl to true
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialOrd, PartialEq)]
 #[serde(rename_all = "camelCase")]
-pub struct PropertyDependency {
+pub struct PropertyExpansion {
     pub property: PropertySpec,
     pub value: Option<String>,
 }

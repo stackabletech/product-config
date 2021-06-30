@@ -152,6 +152,9 @@ properties:
       datatype:
         type: "string"
         unit: *unitMemory
+      defaultValues:
+        - fromVersion: "0.1.0"
+          value: "100mb"
       roles:
         - name: "role_1"
           required: true

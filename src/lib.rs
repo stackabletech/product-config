@@ -20,7 +20,7 @@ use semver::Version;
 use crate::error::Error;
 use crate::types::{ProductConfig, PropertyName, PropertyNameKind, PropertySpec};
 use crate::util::{expand_properties, semver_parse};
-use crate::validation::ValidationResult;
+use crate::validation::{check_allowed_values, ValidationResult};
 use std::str::FromStr;
 
 pub mod error;
@@ -30,10 +30,6 @@ pub mod writer;
 
 mod util;
 mod validation;
-
-pub struct ProductConfigManager {
-    config: ProductConfig,
-}
 
 /// This will be returned for every validated configuration value (including user values
 /// and automatically added values from e.g. dependency, recommended etc.).
@@ -47,14 +43,21 @@ pub enum PropertyValidationResult {
     RecommendedDefault(String),
     /// On Valid, the value passed all checks and can be used.
     Valid(String),
-    /// On Override the given property name does not exist in the product config, and therefore
+    /// On Unknown the given property name does not exist in the product config, and therefore
     /// no checks could be applied for the value.
-    Override(String),
+    Unknown(String),
     /// On warn, the value maybe used with caution.
     Warn(String, Error),
     /// On error, check the provided config and config values.
     /// Should never be used like this!
     Error(String, Error),
+}
+
+/// The struct to interact with the product config. Reads and parses a YAML product configuration.
+/// Performs validation and merging task with user defined properties and the properties provided
+/// in the YAML product configuration.
+pub struct ProductConfigManager {
+    config: ProductConfig,
 }
 
 impl FromStr for ProductConfigManager {
@@ -66,7 +69,7 @@ impl FromStr for ProductConfigManager {
     /// * `contents` - the YAML string content
     fn from_str(contents: &str) -> ValidationResult<Self> {
         Ok(ProductConfigManager {
-            config: serde_yaml::from_str(&contents).map_err(|serde_error| {
+            config: serde_yaml::from_str(contents).map_err(|serde_error| {
                 error::Error::YamlNotParsable {
                     content: contents.to_string(),
                     reason: serde_error.to_string(),
@@ -106,12 +109,12 @@ impl ProductConfigManager {
     ///
     /// # Examples
     ///
-    /// ```no_run
+    /// ```
     /// use product_config::types::PropertyNameKind;
     /// use product_config::ProductConfigManager;
     /// use std::collections::HashMap;
     ///
-    /// let config = ProductConfigManager::from_yaml_file("data/product_configuration.yaml")
+    /// let config = ProductConfigManager::from_yaml_file("data/test_yamls/validate.yaml")
     ///     .unwrap();
     ///
     /// let mut user_data = HashMap::new();
@@ -131,10 +134,8 @@ impl ProductConfigManager {
         role: &str,
         kind: &PropertyNameKind,
         user_config: HashMap<String, Option<String>>,
-    ) -> BTreeMap<String, PropertyValidationResult> {
-        //let mut result_config: BTreeMap<String, PropertyValidationResult> = BTreeMap::new();
-
-        let product_version = semver_parse(version).unwrap();
+    ) -> ValidationResult<BTreeMap<String, PropertyValidationResult>> {
+        let product_version = semver_parse(version)?;
 
         // merge provided user properties with extracted property spec via role / kind and
         // dependencies to be validated later.
@@ -158,6 +159,7 @@ impl ProductConfigManager {
     /// * `version` - the current product version
     /// * `role` - property role provided by the user
     /// * `kind` - property name kind provided by the user
+    /// * `user_config` - map with property name and values (the explicit user config properties)
     pub(crate) fn get_and_expand_properties(
         &self,
         version: &Version,
@@ -235,7 +237,7 @@ impl ProductConfigManager {
         role: &str,
         kind: &PropertyNameKind,
         merged_properties: BTreeMap<String, Option<String>>,
-    ) -> BTreeMap<String, PropertyValidationResult> {
+    ) -> ValidationResult<BTreeMap<String, PropertyValidationResult>> {
         let mut result = BTreeMap::new();
 
         for (name, value) in merged_properties {
@@ -244,21 +246,42 @@ impl ProductConfigManager {
             match (prop, value) {
                 (Some(property), Some(val)) => {
                     let check_datatype = validation::check_datatype(&property, &name, &val);
-                    if check_datatype.is_err() {
+                    if let Err(err) = check_datatype {
                         result.insert(
                             name.to_string(),
-                            PropertyValidationResult::Error(
+                            PropertyValidationResult::Error(val.to_string(), err),
+                        );
+                        continue;
+                    }
+
+                    // TODO: what order? -> write tests for allowed_values and deprecated
+                    if let Err(err) = check_allowed_values(&name, &val, &property.allowed_values) {
+                        result.insert(
+                            name.to_string(),
+                            PropertyValidationResult::Error(val.to_string(), err),
+                        );
+                        continue;
+                    }
+
+                    if property.is_version_deprecated(version)? {
+                        result.insert(
+                            name.to_string(),
+                            PropertyValidationResult::Warn(
                                 val.to_string(),
-                                check_datatype.err().unwrap(),
+                                error::Error::VersionDeprecated {
+                                    property_name: name.to_string(),
+                                    product_version: version.to_string(),
+                                    // we would not reach here if deprecated_since is None
+                                    // so we can just unwrap.
+                                    deprecated_version: property.deprecated_since.unwrap(),
+                                },
                             ),
                         );
                         continue;
                     }
-                    // TODO: deprecated check
-                    // TODO: allowedValues
 
-                    // value is valid, check if it matches recommended or default values
-                    // was provided by recommended value?
+                    // If we reach here the value is valid.
+                    // Check if it was provided by recommended value?
                     if let Some(recommended) = &property.recommended_values {
                         let recommended_value =
                             property.filter_value(version, recommended.as_slice());
@@ -271,7 +294,7 @@ impl ProductConfigManager {
                         }
                     }
 
-                    // was provided by recommended value?
+                    // Check if it was provided by default value?
                     if let Some(default) = &property.default_values {
                         let default_value = property.filter_value(version, default.as_slice());
                         if default_value == Some(val.to_string()) {
@@ -290,28 +313,26 @@ impl ProductConfigManager {
                 }
                 // if required and not set -> error
                 (Some(_property), None) => {
-                    //if property.has_role_required(role) {
                     result.insert(
                         name.clone(),
                         PropertyValidationResult::Error(
-                            "".to_string(),
+                            name.to_string(),
                             error::Error::PropertyValueMissing {
                                 property_name: name,
                             },
                         ),
                     );
-                    //}
                 }
-                // override
+                // unknown
                 (None, Some(val)) => {
-                    result.insert(name, PropertyValidationResult::Override(val.to_string()));
+                    result.insert(name, PropertyValidationResult::Unknown(val.to_string()));
                     continue;
                 }
                 _ => {}
             }
         }
 
-        result
+        Ok(result)
     }
 
     fn find_property(
@@ -531,9 +552,9 @@ mod tests {
             "ENV_FLOAT".to_string() => PropertyValidationResult::RecommendedDefault("50.0".to_string()),
             "ENV_INTEGER_PORT_MIN_MAX".to_string() => PropertyValidationResult::RecommendedDefault("20000".to_string()),
             "ENV_ENABLE_PASSWORD".to_string() => PropertyValidationResult::Valid("true".to_string()),
-            "ENV_PASSWORD".to_string() => PropertyValidationResult::Error("".to_string(), Error::PropertyValueMissing { property_name: "ENV_PASSWORD".to_string() }),
+            "ENV_PASSWORD".to_string() => PropertyValidationResult::Error("ENV_PASSWORD".to_string(), Error::PropertyValueMissing { property_name: "ENV_PASSWORD".to_string() }),
             "ENV_ENABLE_PASSWORD".to_string() => PropertyValidationResult::Valid("true".to_string()),
-            "ENV_PROPERTY_STRING_DEPRECATED".to_string() => PropertyValidationResult::Error("".to_string(), Error::PropertyValueMissing { property_name: "ENV_PROPERTY_STRING_DEPRECATED".to_string() }),
+            "ENV_PROPERTY_STRING_DEPRECATED".to_string() => PropertyValidationResult::Warn("100mb".to_string(), Error::VersionDeprecated { property_name: "ENV_PROPERTY_STRING_DEPRECATED".to_string(), product_version: "0.5.0".to_string(), deprecated_version: "0.4.0".to_string() }),
         })
     )]
     #[case::get_valid_float(
@@ -617,7 +638,7 @@ mod tests {
             "ENV_SSL_CERTIFICATE_PATH".to_string() => Some("/opt/stackable/zookeeper-operator/pki".to_string())
         }),
         macro_to_get_result(collection!{
-            "ENV_SSL_CERTIFICATE_PATH".to_string() => PropertyValidationResult::Override("/opt/stackable/zookeeper-operator/pki".to_string()),
+            "ENV_SSL_CERTIFICATE_PATH".to_string() => PropertyValidationResult::Unknown("/opt/stackable/zookeeper-operator/pki".to_string()),
         })
     )]
     #[case::get_override_ssl_certificate_path(
@@ -690,11 +711,13 @@ mod tests {
         #[case] path: &str,
         #[case] user_data: HashMap<String, Option<String>>,
         #[case] expected: BTreeMap<String, PropertyValidationResult>,
-    ) {
+    ) -> ValidationResult<()> {
         let manager = ProductConfigManager::from_yaml_file(path).unwrap();
 
-        let result = manager.get("0.5.0", role, kind, user_data);
+        let result = manager.get("0.5.0", role, kind, user_data)?;
 
         assert_eq!(result, expected);
+
+        Ok(())
     }
 }

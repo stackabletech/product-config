@@ -29,6 +29,10 @@ where
 
 /// Generic method to write java properties
 /// Accepts HashMap<String, Option<String>> or BTreeMap<String, Option<String>>.
+/// The map is written as follows (where key=String and val=Option<String>)
+/// val = None          -> key=
+/// val = Some("")      -> key=""
+/// val = Some("foo")   -> key="abc"
 pub fn write_java_properties<'a, W, T>(writer: W, properties: T) -> Result<(), PropertiesError>
 where
     W: Write,

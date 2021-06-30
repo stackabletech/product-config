@@ -24,7 +24,7 @@ pub enum Error {
 
     #[error("[{property_name}]: current product version is '{product_version}' -> property deprecated since version '{deprecated_version}'")]
     VersionDeprecated {
-        property_name: PropertyName,
+        property_name: String,
         product_version: String,
         deprecated_version: String,
     },
@@ -63,7 +63,7 @@ pub enum Error {
 
     #[error("[{property_name}]: value '{value}' not in allowed values: {allowed_values:?}")]
     PropertyValueNotInAllowedValues {
-        property_name: PropertyName,
+        property_name: String,
         value: String,
         allowed_values: Vec<String>,
     },
