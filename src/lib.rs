@@ -21,6 +21,7 @@ use crate::error::Error;
 use crate::types::{ProductConfig, PropertyName, PropertyNameKind, PropertySpec};
 use crate::util::{expand_properties, semver_parse};
 use crate::validation::ValidationResult;
+use std::str::FromStr;
 
 pub mod error;
 pub mod ser;
@@ -56,6 +57,25 @@ pub enum PropertyValidationResult {
     Error(String, Error),
 }
 
+impl FromStr for ProductConfigManager {
+    type Err = error::Error;
+    /// Create a ProductConfig from a YAML string.
+    ///
+    /// # Arguments
+    ///
+    /// * `contents` - the YAML string content
+    fn from_str(contents: &str) -> ValidationResult<Self> {
+        Ok(ProductConfigManager {
+            config: serde_yaml::from_str(&contents).map_err(|serde_error| {
+                error::Error::YamlNotParsable {
+                    content: contents.to_string(),
+                    reason: serde_error.to_string(),
+                }
+            })?,
+        })
+    }
+}
+
 impl ProductConfigManager {
     /// Create a ProductConfig from a YAML file.
     ///
@@ -70,22 +90,6 @@ impl ProductConfigManager {
         Self::from_str(&contents).map_err(|serde_error| error::Error::YamlFileNotParsable {
             file: file_path.to_string(),
             reason: serde_error.to_string(),
-        })
-    }
-
-    /// Create a ProductConfig from a YAML string.
-    ///
-    /// # Arguments
-    ///
-    /// * `contents` - the YAML string content
-    pub fn from_str(contents: &str) -> ValidationResult<Self> {
-        Ok(ProductConfigManager {
-            config: serde_yaml::from_str(&contents).map_err(|serde_error| {
-                error::Error::YamlNotParsable {
-                    content: contents.to_string(),
-                    reason: serde_error.to_string(),
-                }
-            })?,
         })
     }
 
@@ -165,35 +169,29 @@ impl ProductConfigManager {
 
         for property in &self.config.properties {
             let property_names = property.all_property_names();
-            // if user provides a property that may expand into other properties, we need to check that
-            // the roll matches and the expanded properties are supported (role and version match).
+            // If user provides a property that exists in the product config and fits the role and
+            // version, we have to expand if needed.
             if util::hashmap_contains_any_key(&user_config, &property_names)
                 && property.has_role(role)
+                && property.is_version_supported(version)?
             {
                 merged_properties.extend(expand_properties(property, version, role, kind)?);
-            // If the user does not provide a property that is required and expands into other properties
-            // we need to merge them
-            } else {
-                if !property.has_role_required(role) {
-                    continue;
-                }
-
-                if !property.is_version_supported(version)? {
-                    continue;
-                }
-
+            // If the user does not provide a property which is required in the product config,
+            // and fits the role and version, we have to expand if needed.
+            } else if property.has_role_required(role) && property.is_version_supported(version)? {
                 if let Some((name, value)) = property.recommended_or_default(version, kind) {
                     merged_properties.insert(name, value);
                 }
-
                 merged_properties.extend(expand_properties(property, version, role, kind)?);
             }
         }
 
+        // Add any unknown (not found in product config) properties provided by the user -> Overrides
         merged_properties.extend(user_config);
 
-        // remove no_copy elements
-
+        // The user can provide "Meta" properties, that do not exists on their own and only expand
+        // into other "valid" properties. Therefore it requires the "no_copy" field to indicate
+        // that it should not end up in the final configuration.
         Ok(self.remove_no_copy_properties(version, role, kind, &merged_properties))
     }
 

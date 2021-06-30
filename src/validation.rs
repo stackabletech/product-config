@@ -1,5 +1,5 @@
 use crate::error::Error;
-use crate::types::{Datatype, PropertyName, PropertySpec, Unit};
+use crate::types::{Datatype, PropertySpec, Unit};
 use std::fmt::Display;
 use std::str::FromStr;
 
@@ -476,23 +476,23 @@ pub(crate) fn check_datatype(
 /// * `property_value` - property value to be validated
 /// * `allowed_values` - vector of allowed values
 ///
-fn check_allowed_values(
-    property_name: &PropertyName,
-    property_value: &str,
-    allowed_values: &Option<Vec<String>>,
-) -> ValidationResult<()> {
-    if allowed_values.is_some() {
-        let allowed_values = allowed_values.clone().unwrap();
-        if !allowed_values.is_empty() && !allowed_values.contains(&property_value.to_string()) {
-            return Err(Error::PropertyValueNotInAllowedValues {
-                property_name: property_name.clone(),
-                value: property_value.to_string(),
-                allowed_values,
-            });
-        }
-    }
-    Ok(())
-}
+// fn check_allowed_values(
+//     property_name: &PropertyName,
+//     property_value: &str,
+//     allowed_values: &Option<Vec<String>>,
+// ) -> ValidationResult<()> {
+//     if allowed_values.is_some() {
+//         let allowed_values = allowed_values.clone().unwrap();
+//         if !allowed_values.is_empty() && !allowed_values.contains(&property_value.to_string()) {
+//             return Err(Error::PropertyValueNotInAllowedValues {
+//                 property_name: property_name.clone(),
+//                 value: property_value.to_string(),
+//                 allowed_values,
+//             });
+//         }
+//     }
+//     Ok(())
+// }
 
 /// Returns the provided scalar parameter value of type T (i16, i32, i64, f32, f62-..) if no parsing errors appear
 ///

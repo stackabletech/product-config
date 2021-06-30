@@ -1,4 +1,4 @@
-use crate::types::{PropertyDependency, PropertyValueSpec};
+use crate::types::PropertyValueSpec;
 use crate::PropertyName;
 
 #[derive(thiserror::Error, Clone, Debug, PartialOrd, PartialEq)]
@@ -94,45 +94,5 @@ pub enum Error {
     UnitSettingNotFound {
         property_name: PropertyName,
         unit: String,
-    },
-
-    #[error("[{property_name}]: required dependency not provided: '{dependency:?}'")]
-    PropertyDependencyMissing {
-        property_name: PropertyName,
-        dependency: Vec<PropertyName>,
-    },
-
-    #[error(
-        "[{property_name}]: dependency '{dependency}' requires no values, but was set to '{user_value}'"
-    )]
-    PropertyDependencyUserValueNotRequired {
-        property_name: PropertyName,
-        dependency: String,
-        user_value: String,
-    },
-
-    #[error(
-        "[{property_name}]: dependency '{dependency}' requires value '{required_value}' to be set"
-    )]
-    PropertyDependencyUserValueMissing {
-        property_name: PropertyName,
-        dependency: String,
-        required_value: String,
-    },
-
-    #[error(
-        "[{property_name}]: provided value '{user_value}' does not match required value '{required_value}' for dependency '{dependency}'"
-    )]
-    PropertyDependencyValueInvalid {
-        property_name: PropertyName,
-        dependency: String,
-        user_value: String,
-        required_value: String,
-    },
-
-    #[error("[{property_name}]: no provided or recommended values in dependency '{dependency:?}'")]
-    PropertyDependencyValueMissing {
-        property_name: PropertyName,
-        dependency: PropertyDependency,
     },
 }
