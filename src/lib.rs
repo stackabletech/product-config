@@ -255,7 +255,7 @@ impl ProductConfigManager {
                         continue;
                     }
 
-                    // TODO: what order? -> write tests for allowed_values and deprecated
+                    // TODO: what order?
                     if let Err(err) = check_allowed_values(&name, &val, &property.allowed_values) {
                         result.insert(
                             name.to_string(),
@@ -321,7 +321,7 @@ impl ProductConfigManager {
                     result.insert(
                         name.clone(),
                         PropertyValidationResult::Error(
-                            name.to_string(),
+                            "".to_string(),
                             error::Error::PropertyValueMissing {
                                 property_name: name,
                             },
@@ -556,7 +556,7 @@ mod tests {
             "ENV_FLOAT".to_string() => PropertyValidationResult::RecommendedDefault("50.0".to_string()),
             "ENV_INTEGER_PORT_MIN_MAX".to_string() => PropertyValidationResult::RecommendedDefault("20000".to_string()),
             "ENV_ENABLE_PASSWORD".to_string() => PropertyValidationResult::Valid("true".to_string()),
-            "ENV_PASSWORD".to_string() => PropertyValidationResult::Error("ENV_PASSWORD".to_string(), Error::PropertyValueMissing { property_name: "ENV_PASSWORD".to_string() }),
+            "ENV_PASSWORD".to_string() => PropertyValidationResult::Error("".to_string(), Error::PropertyValueMissing { property_name: "ENV_PASSWORD".to_string() }),
             "ENV_ENABLE_PASSWORD".to_string() => PropertyValidationResult::Valid("true".to_string()),
             "ENV_PROPERTY_STRING_DEPRECATED".to_string() => PropertyValidationResult::Warn("100mb".to_string(), Error::VersionDeprecated { property_name: "ENV_PROPERTY_STRING_DEPRECATED".to_string(), product_version: "0.5.0".to_string(), deprecated_version: "0.4.0".to_string() }),
         })
