@@ -11,25 +11,26 @@
 //! - apply mode for config changes (e.g. restart)
 //! - additional information like web links or descriptions
 //!
+use std::collections::{BTreeMap, HashMap};
+use std::string::String;
+use std::{fs, str};
+
+use semver::Version;
+
+use crate::error::Error;
+use crate::types::{ProductConfig, PropertyName, PropertyNameKind, PropertySpec, StackableVersion};
+use crate::util::expand_properties;
+use crate::validation::{check_allowed_values, ValidationResult};
+use std::ops::Deref;
+use std::str::FromStr;
+
 pub mod error;
-pub mod reader;
 pub mod ser;
 pub mod types;
 pub mod writer;
 
 mod util;
 mod validation;
-
-use std::collections::HashMap;
-use std::str;
-use std::string::String;
-
-use crate::error::Error;
-use crate::reader::ConfigReader;
-use crate::types::{ProductConfigSpecProperties, PropertyName, PropertyNameKind, PropertySpec};
-use crate::util::semver_parse;
-use crate::validation::ValidationResult;
-use semver::Version;
 
 /// This will be returned for every validated configuration value (including user values
 /// and automatically added values from e.g. dependency, recommended etc.).
@@ -43,6 +44,9 @@ pub enum PropertyValidationResult {
     RecommendedDefault(String),
     /// On Valid, the value passed all checks and can be used.
     Valid(String),
+    /// On Unknown the given property name does not exist in the product config, and therefore
+    /// no checks could be applied for the value.
+    Unknown(String),
     /// On warn, the value maybe used with caution.
     Warn(String, Error),
     /// On error, check the provided config and config values.
@@ -50,298 +54,674 @@ pub enum PropertyValidationResult {
     Error(String, Error),
 }
 
-/// This is the main struct to hold all our knowledge about a certain product's configuration.
-///
-/// A product configuration consists of a list of properties and their specification
-/// as well as some "configuration configuration". The latter describes some details about the configuration spec itself.
-#[derive(Clone, Debug)]
-pub struct ProductConfigSpec {
-    // provided config units with corresponding regex pattern
-    config_spec: ProductConfigSpecProperties,
-    // property names as key and the corresponding property spec as value
-    property_specs: HashMap<PropertyName, PropertySpec>,
+/// The struct to interact with the product config. Reads and parses a YAML product configuration.
+/// Performs validation and merging task with user defined properties and the properties provided
+/// in the YAML product configuration.
+pub struct ProductConfigManager {
+    config: ProductConfig,
 }
 
-impl ProductConfigSpec {
-    /// Create a ProductConfig based on a config reader like e.g. JSON, YAML etc.
+impl FromStr for ProductConfigManager {
+    type Err = error::Error;
+    /// Create a ProductConfig from a YAML string.
     ///
     /// # Arguments
     ///
-    /// * `config_reader` - config_reader implementation
+    /// * `contents` - the YAML string content
+    fn from_str(contents: &str) -> ValidationResult<Self> {
+        Ok(ProductConfigManager {
+            config: serde_yaml::from_str(contents).map_err(|serde_error| {
+                error::Error::YamlNotParsable {
+                    content: contents.to_string(),
+                    reason: serde_error.to_string(),
+                }
+            })?,
+        })
+    }
+}
+
+impl ProductConfigManager {
+    /// Create a ProductConfig from a YAML file.
     ///
-    pub fn new<CR: ConfigReader>(config_reader: CR) -> ValidationResult<Self> {
-        let product_config_spec = config_reader.read()?;
+    /// # Arguments
+    ///
+    /// * `file_path` - the path to the YAML file
+    pub fn from_yaml_file(file_path: &str) -> ValidationResult<Self> {
+        let contents = fs::read_to_string(file_path).map_err(|_| error::Error::FileNotFound {
+            file_name: file_path.to_string(),
+        })?;
 
-        validation::validate_property_spec(
-            &product_config_spec.config_spec,
-            &product_config_spec.property_specs,
-        )?;
-
-        Ok(product_config_spec)
+        Self::from_str(&contents).map_err(|serde_error| error::Error::YamlFileNotParsable {
+            file: file_path.to_string(),
+            reason: serde_error.to_string(),
+        })
     }
 
-    /// Retrieve and check config properties depending on the kind (e.g. env, conf),
-    /// the required config file (e.g. environment variables or config properties).
-    /// Add other provided properties that match the config kind, config file and config role.
-    /// Automatically add and correct missing or wrong config properties and dependencies.
+    /// This function merges the user provided configuration properties with the product configuration
+    /// and validates the result, both in a single step. The caller is expected to look at each
+    /// [PropertyValidationResult] and take the appropriate action based on the product requirements.
     ///
     /// # Arguments
     ///
     /// * `version` - the current product version
-    /// * `kind` - kind provided by the user
     /// * `role` - role provided by the user
+    /// * `kind` - kind provided by the user
     /// * `user_config` - map with property name and values (the explicit user config properties)
     ///
     /// # Examples
     ///
     /// ```
-    /// use product_config::reader::ConfigJsonReader;
     /// use product_config::types::PropertyNameKind;
-    /// use product_config::ProductConfigSpec;
+    /// use product_config::ProductConfigManager;
     /// use std::collections::HashMap;
     ///
-    /// let config = ProductConfigSpec::new(ConfigJsonReader::new(
-    ///     "data/test_config_spec.json",
-    ///     "data/test_property_spec.json",
-    ///   )
-    /// ).unwrap();
+    /// let config = ProductConfigManager::from_yaml_file("data/test_yamls/validate.yaml")
+    ///     .unwrap();
     ///
     /// let mut user_data = HashMap::new();
-    /// user_data.insert("ENV_INTEGER_PORT_MIN_MAX".to_string(), "12345".to_string());
-    /// user_data.insert("ENV_PROPERTY_STRING_MEMORY".to_string(), "1g".to_string());
+    /// user_data.insert("ENV_INTEGER_PORT_MIN_MAX".to_string(), Some("12345".to_string()));
+    /// user_data.insert("ENV_PROPERTY_STRING_MEMORY".to_string(), Some("1g".to_string()));
     ///
     /// let env_sh = config.get(
     ///     "0.5.0",
+    ///     "role_1",
     ///     &PropertyNameKind::File("env.sh".to_string()),
-    ///     Some("role_1"),
-    ///     &user_data,
+    ///     user_data,
     /// );
     /// ```
-    ///
     pub fn get(
         &self,
         version: &str,
+        role: &str,
         kind: &PropertyNameKind,
-        role: Option<&str>,
-        user_config: &HashMap<String, String>,
-    ) -> ValidationResult<HashMap<String, PropertyValidationResult>> {
-        let mut result_config = HashMap::new();
-
-        let product_version = semver_parse(version)?;
+        user_config: HashMap<String, Option<String>>,
+    ) -> ValidationResult<BTreeMap<String, PropertyValidationResult>> {
+        let product_version = StackableVersion::parse(version)?;
 
         // merge provided user properties with extracted property spec via role / kind and
         // dependencies to be validated later.
-        let merged_properties = self.merge_properties(user_config, &product_version, kind, role);
+        let merged_properties = self
+            .get_and_expand_properties(&product_version, role, kind, user_config)
+            .unwrap();
 
-        for (name, value) in &merged_properties {
-            let property_name = &PropertyName {
-                name: name.clone(),
-                kind: kind.clone(),
-            };
-
-            result_config.insert(
-                property_name.name.clone(),
-                validation::validate(
-                    &self.property_specs,
-                    &self.config_spec,
-                    &merged_properties,
-                    &product_version,
-                    role,
-                    property_name,
-                    value,
-                ),
-            );
-        }
-
-        Ok(result_config)
+        self.validate(&product_version, role, kind, merged_properties)
     }
 
-    /// Merge provided user config properties and available property spec (from JSON, YAML...)
-    /// depending on kind and role to be validated later.
+    /// Merge the provided user config properties with the product configuration (loaded from YAML)
+    /// depending on kind, role and version. The user configuration has the highest priority, followed
+    /// by the recommended values from the product configuration. Finally, if none are available,
+    /// the default values from the product configuration are used.
+    /// This function also expands properties if they are required for the given role or if the user
+    /// has requested so in the [user_config] parameter.
+    ///
     ///
     /// # Arguments
     ///
-    /// * `user_config` - map with property name and values (the explicit user config properties)
     /// * `version` - the current product version
-    /// * `kind` - property name kind provided by the user
     /// * `role` - property role provided by the user
-    ///
-    fn merge_properties(
+    /// * `kind` - property name kind provided by the user
+    /// * `user_config` - map with property name and values (the explicit user config properties)
+    pub(crate) fn get_and_expand_properties(
         &self,
-        user_config: &HashMap<String, String>,
         version: &Version,
+        role: &str,
         kind: &PropertyNameKind,
-        role: Option<&str>,
-    ) -> HashMap<String, String> {
-        let mut merged_properties = HashMap::new();
+        user_config: HashMap<String, Option<String>>,
+    ) -> ValidationResult<BTreeMap<String, Option<String>>> {
+        let mut merged_properties = BTreeMap::new();
 
-        if let Ok(properties) =
-            util::get_matching_properties(&self.property_specs, kind, role, version)
-        {
-            merged_properties.extend(properties)
+        for property in &self.config.properties {
+            let property_names = property.all_property_names();
+            // If user provides a property that exists in the product config and fits the role and
+            // version, we have to expand if needed.
+            if util::hashmap_contains_any_key(&user_config, &property_names)
+                && property.has_role(role)
+                && property.is_version_supported(version)?
+            {
+                merged_properties.extend(expand_properties(property, version, role, kind)?);
+            // If the user does not provide a property which is required in the product config,
+            // and fits the role and version, we have to expand if needed.
+            } else if property.has_role_required(role) && property.is_version_supported(version)? {
+                if let Some((name, value)) = property.recommended_or_default(version, kind) {
+                    merged_properties.insert(name, value);
+                }
+                merged_properties.extend(expand_properties(property, version, role, kind)?);
+            }
         }
 
-        if let Ok(dependencies) =
-            util::get_matching_dependencies(&self.property_specs, user_config, version, kind)
-        {
-            merged_properties.extend(dependencies);
+        // Add any unknown (not found in product config) properties provided by the user -> Overrides
+        merged_properties.extend(user_config);
+
+        // The user can provide "Meta" properties, that do not exists on their own and only expand
+        // into other "valid" properties. Therefore it requires the "no_copy" field to indicate
+        // that it should not end up in the final configuration.
+        Ok(self.remove_no_copy_properties(version, role, kind, &merged_properties))
+    }
+
+    fn remove_no_copy_properties(
+        &self,
+        version: &Version,
+        role: &str,
+        kind: &PropertyNameKind,
+        properties: &BTreeMap<String, Option<String>>,
+    ) -> BTreeMap<String, Option<String>> {
+        let mut result = BTreeMap::new();
+
+        for (name, value) in properties {
+            if let Some(prop) = self.find_property(&name, role, kind, version) {
+                if prop.has_role_no_copy(role) {
+                    continue;
+                }
+            }
+            result.insert(name.clone(), value.clone());
         }
 
-        merged_properties.extend(user_config.clone());
+        result
+    }
 
-        merged_properties
+    /// Validates the given `merged_properties` by performing the following actions:
+    /// * syntax checks on the values
+    /// * mandatory checks (if a property is required for the given role and version)
+    /// * comparison checks against the recommended and default values
+    ///
+    /// Properties that are not found in the product configuration are considered to be
+    /// user "overrides".
+    ///
+    /// # Arguments
+    /// * `version` - the current product version
+    /// * `role` - property role provided by the user
+    /// * `kind` - property name kind provided by the user
+    /// * `merged_properties` - merged user and property spec (matching role, kind etc.)
+    pub(crate) fn validate(
+        &self,
+        version: &Version,
+        role: &str,
+        kind: &PropertyNameKind,
+        merged_properties: BTreeMap<String, Option<String>>,
+    ) -> ValidationResult<BTreeMap<String, PropertyValidationResult>> {
+        let mut result = BTreeMap::new();
+
+        for (name, value) in merged_properties {
+            let prop = self.find_property(&name, role, kind, version);
+
+            match (prop, value) {
+                (Some(property), Some(val)) => {
+                    let check_datatype = validation::check_datatype(&property, &name, &val);
+                    if let Err(err) = check_datatype {
+                        result.insert(
+                            name.to_string(),
+                            PropertyValidationResult::Error(val.to_string(), err),
+                        );
+                        continue;
+                    }
+
+                    // TODO: what order?
+                    if let Err(err) = check_allowed_values(&name, &val, &property.allowed_values) {
+                        result.insert(
+                            name.to_string(),
+                            PropertyValidationResult::Error(val.to_string(), err),
+                        );
+                        continue;
+                    }
+
+                    if property.is_version_deprecated(version)? {
+                        result.insert(
+                            name.to_string(),
+                            PropertyValidationResult::Warn(
+                                val.to_string(),
+                                error::Error::VersionDeprecated {
+                                    property_name: name.to_string(),
+                                    product_version: version.to_string(),
+                                    // we would not reach here if deprecated_since is None
+                                    // so we can just unwrap.
+                                    deprecated_version: property
+                                        .deprecated_since
+                                        .unwrap()
+                                        .deref()
+                                        .to_string(),
+                                },
+                            ),
+                        );
+                        continue;
+                    }
+
+                    // If we reach here the value is valid.
+                    // Check if it was provided by recommended value?
+                    if let Some(recommended) = &property.recommended_values {
+                        let recommended_value =
+                            property.filter_value(version, recommended.as_slice());
+                        if recommended_value == Some(val.to_string()) {
+                            result.insert(
+                                name.to_string(),
+                                PropertyValidationResult::RecommendedDefault(val.to_string()),
+                            );
+                            continue;
+                        }
+                    }
+
+                    // Check if it was provided by default value?
+                    if let Some(default) = &property.default_values {
+                        let default_value = property.filter_value(version, default.as_slice());
+                        if default_value == Some(val.to_string()) {
+                            result.insert(
+                                name.to_string(),
+                                PropertyValidationResult::Default(val.to_string()),
+                            );
+                            continue;
+                        }
+                    }
+
+                    result.insert(
+                        name.to_string(),
+                        PropertyValidationResult::Valid(val.to_string()),
+                    );
+                }
+                // if required and not set -> error
+                (Some(_property), None) => {
+                    result.insert(
+                        name.clone(),
+                        PropertyValidationResult::Error(
+                            "".to_string(),
+                            error::Error::PropertyValueMissing {
+                                property_name: name,
+                            },
+                        ),
+                    );
+                }
+                // unknown
+                (None, Some(val)) => {
+                    result.insert(name, PropertyValidationResult::Unknown(val.to_string()));
+                    continue;
+                }
+                _ => {}
+            }
+        }
+
+        Ok(result)
+    }
+
+    fn find_property(
+        &self,
+        name: &str,
+        role: &str,
+        kind: &PropertyNameKind,
+        version: &Version,
+    ) -> Option<PropertySpec> {
+        for property_anchor in &self.config.properties {
+            if property_anchor.name_from_kind(kind) != Some(name.to_string()) {
+                continue;
+            }
+
+            if !property_anchor.has_role(role) {
+                continue;
+            }
+
+            if property_anchor.is_version_supported(version).is_err() {
+                continue;
+            }
+
+            return Some(property_anchor.property.clone());
+        }
+
+        None
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::error::Error;
-    use crate::reader::ConfigJsonReader;
-    use crate::types::{PropertyName, PropertyNameKind};
-    use crate::{ProductConfigSpec, PropertyValidationResult};
-    use rstest::*;
-    use std::collections::HashMap;
-
-    const ENV_INTEGER_PORT_MIN_MAX: &str = "ENV_INTEGER_PORT_MIN_MAX";
-
-    const ENV_FLOAT: &str = "ENV_FLOAT";
-    //const ENV_PROPERTY_STRING_MEMORY: &str = "ENV_PROPERTY_STRING_MEMORY";
-    //const ENV_PROPERTY_STRING_DEPRECATED: &str = "ENV_PROPERTY_STRING_DEPRECATED";
-    //const ENV_ALLOWED_VALUES: &str = "ENV_ALLOWED_VALUES";
-    //const ENV_SECURITY: &str = "ENV_SECURITY";
-    //const ENV_SECURITY_PASSWORD: &str = "ENV_SECURITY_PASSWORD";
-    const ENV_SSL_ENABLED: &str = "ENV_SSL_ENABLED";
-    const ENV_SSL_CERTIFICATE_PATH: &str = "ENV_SSL_CERTIFICATE_PATH";
-
-    const ROLE_1: &str = "role_1";
-    const VERSION_0_5_0: &str = "0.5.0";
-    const CONF_FILE: &str = "env.sh";
-
-    fn create_empty_data_and_expected() -> (
-        HashMap<String, String>,
-        HashMap<String, PropertyValidationResult>,
-    ) {
-        let float_recommended = "50.0";
-        let port_recommended = "20000";
-
-        let data = HashMap::new();
-
-        let mut expected = HashMap::new();
-        expected.insert(
-            ENV_INTEGER_PORT_MIN_MAX.to_string(),
-            PropertyValidationResult::RecommendedDefault(port_recommended.to_string()),
-        );
-        expected.insert(
-            ENV_FLOAT.to_string(),
-            PropertyValidationResult::RecommendedDefault(float_recommended.to_string()),
-        );
-        (data, expected)
+    macro_rules! collection {
+        // map-like
+        ($($k:expr => $v:expr),* $(,)?) => {
+            std::iter::Iterator::collect(std::array::IntoIter::new([$(($k, $v),)*]))
+        };
+        // set-like
+        ($($v:expr),* $(,)?) => {
+            std::iter::Iterator::collect(std::array::IntoIter::new([$($v,)*]))
+        };
     }
 
-    fn create_correct_data_and_expected() -> (
-        HashMap<String, String>,
-        HashMap<String, PropertyValidationResult>,
-    ) {
-        let port = "12345";
-        let ssl_enabled = "true";
-        let certificate_path = "/tmp/ssl_key.xyz";
-        let float_value = "55.555";
+    use std::collections::{BTreeMap, HashMap};
 
-        let mut data = HashMap::new();
-        data.insert(ENV_INTEGER_PORT_MIN_MAX.to_string(), port.to_string());
-        data.insert(
-            ENV_SSL_CERTIFICATE_PATH.to_string(),
-            certificate_path.to_string(),
-        );
-        data.insert(ENV_FLOAT.to_string(), float_value.to_string());
+    use super::*;
+    use crate::error::Error;
+    use crate::types::PropertyNameKind;
+    use crate::ProductConfigManager;
+    use rstest::*;
 
-        let mut expected = HashMap::new();
+    fn macro_to_hash_map(map: HashMap<String, Option<String>>) -> HashMap<String, Option<String>> {
+        map
+    }
 
-        expected.insert(
-            ENV_INTEGER_PORT_MIN_MAX.to_string(),
-            PropertyValidationResult::Valid(port.to_string()),
-        );
-        expected.insert(
-            ENV_SSL_CERTIFICATE_PATH.to_string(),
-            PropertyValidationResult::Valid(certificate_path.to_string()),
-        );
-        expected.insert(
-            ENV_SSL_ENABLED.to_string(),
-            PropertyValidationResult::RecommendedDefault(ssl_enabled.to_string()),
-        );
-        expected.insert(
-            ENV_FLOAT.to_string(),
-            PropertyValidationResult::Valid(float_value.to_string()),
-        );
+    fn macro_to_btree_map(
+        map: BTreeMap<String, Option<String>>,
+    ) -> BTreeMap<String, Option<String>> {
+        map
+    }
 
-        (data, expected)
+    fn macro_to_get_result(
+        map: BTreeMap<String, PropertyValidationResult>,
+    ) -> BTreeMap<String, PropertyValidationResult> {
+        map
     }
 
     #[rstest]
-    #[case(
-        VERSION_0_5_0,
-        &PropertyNameKind::File(CONF_FILE.to_string()),
-        Some(ROLE_1),
-        create_empty_data_and_expected().0,
-        create_empty_data_and_expected().1,
+    #[case::expands_role_required_expandee_role_not_required(
+        "0.5.0",
+        &PropertyNameKind::File("env.sh".to_string()),
+        "role_1",
+        "data/test_yamls/expands_role_required_expandee_role_not_required.yaml",
+        macro_to_hash_map(collection!{ "ENV_PASSWORD".to_string() => Some("secret".to_string()) }),
+        macro_to_btree_map(collection!{
+            "ENV_PASSWORD".to_string() => Some("secret".to_string()),
+            "ENV_ENABLE_PASSWORD".to_string() => Some("true".to_string())
+        }),
     )]
-    #[case(
-      VERSION_0_5_0,
-      &PropertyNameKind::File(CONF_FILE.to_string()),
-      Some(ROLE_1),
-      create_correct_data_and_expected().0,
-      create_correct_data_and_expected().1,
+    #[case::expands_role_required_expandee_role_not_required_no_user_input(
+        "0.5.0",
+        &PropertyNameKind::File("env.sh".to_string()),
+        "role_1",
+        "data/test_yamls/expands_role_required_expandee_role_not_required.yaml",
+        HashMap::new(),
+        macro_to_btree_map(collection!{
+            "ENV_PASSWORD".to_string() => None,
+            "ENV_ENABLE_PASSWORD".to_string() => Some("true".to_string())
+        }),
     )]
-    #[trace]
-    fn test_get_kind_conf_role_1(
+    #[case::expands_role_not_required_expandee_role_not_required_no_user_input(
+        "0.5.0",
+        &PropertyNameKind::File("env.sh".to_string()),
+        "role_1",
+        "data/test_yamls/expands_role_not_required_expandee_role_not_required.yaml",
+        HashMap::new(),
+        BTreeMap::new(),
+    )]
+    #[case::expands_role_not_required_expandee_role_required_no_user_input(
+        "0.5.0",
+        &PropertyNameKind::File("env.sh".to_string()),
+        "role_1",
+        "data/test_yamls/expands_role_not_required_expandee_role_required.yaml",
+        HashMap::new(),
+        macro_to_btree_map(collection!{
+            "ENV_ENABLE_PASSWORD".to_string() => None,
+        }),
+    )]
+    #[case::expands_role_not_required_expandee_role_required_with_user_input_1(
+        "0.5.0",
+        &PropertyNameKind::File("env.sh".to_string()),
+        "role_1",
+        "data/test_yamls/expands_role_not_required_expandee_role_required.yaml",
+        macro_to_hash_map(collection!{
+            "ENV_ENABLE_PASSWORD".to_string() => Some("true".to_string())
+        }),
+        macro_to_btree_map(collection!{
+            "ENV_ENABLE_PASSWORD".to_string() => Some("true".to_string()),
+        }),
+    )]
+    #[case::expands_role_not_required_expandee_role_required_with_user_input_2(
+        "0.5.0",
+        &PropertyNameKind::File("env.sh".to_string()),
+        "role_1",
+        "data/test_yamls/expands_role_not_required_expandee_role_required.yaml",
+        macro_to_hash_map(collection!{
+            "ENV_PASSWORD".to_string() => Some("secret".to_string())
+        }),
+        macro_to_btree_map(collection!{
+            "ENV_PASSWORD".to_string() => Some("secret".to_string()),
+            "ENV_ENABLE_PASSWORD".to_string() => Some("true".to_string()),
+        }),
+    )]
+    #[case::expands_role_required_expandee_role_required_no_user_input(
+        "0.5.0",
+        &PropertyNameKind::File("env.sh".to_string()),
+        "role_1",
+        "data/test_yamls/expands_role_required_expandee_role_required.yaml",
+        HashMap::new(),
+        macro_to_btree_map(collection!{
+            "ENV_PASSWORD".to_string() => None,
+            "ENV_ENABLE_PASSWORD".to_string() => Some("true".to_string()),
+        }),
+    )]
+    #[case::expands_role_required_expandee_role_required_with_user_input1(
+        "0.5.0",
+        &PropertyNameKind::File("env.sh".to_string()),
+        "role_1",
+        "data/test_yamls/expands_role_required_expandee_role_required.yaml",
+        macro_to_hash_map(collection!{
+            "ENV_PASSWORD".to_string() => Some("secret".to_string())
+        }),
+        macro_to_btree_map(collection!{
+            "ENV_PASSWORD".to_string() => Some("secret".to_string()),
+            "ENV_ENABLE_PASSWORD".to_string() => Some("true".to_string()),
+        }),
+    )]
+    #[case::test_product_config_no_user_input(
+        "0.5.0",
+        &PropertyNameKind::File("env.sh".to_string()),
+        "role_1",
+        "data/test_yamls/test_product_config.yaml",
+        HashMap::new(),
+        macro_to_btree_map(collection!{
+            "ENV_FLOAT".to_string() => Some("50.0".to_string()),
+            "ENV_INTEGER_PORT_MIN_MAX".to_string() => Some("20000".to_string()),
+            "ENV_PROPERTY_STRING_DEPRECATED".to_string() => None,
+            "ENV_PASSWORD".to_string() => None,
+            "ENV_ENABLE_PASSWORD".to_string() => Some("true".to_string()),
+    }),
+    )]
+    #[case::expands_role_required_no_copy_no_user_input(
+        "0.5.0",
+        &PropertyNameKind::File("env.sh".to_string()),
+        "role_1",
+        "data/test_yamls/expands_role_required_no_copy.yaml",
+        HashMap::new(),
+        macro_to_btree_map(collection!{
+            "ENV_SSL_CERTIFICATE_PATH".to_string() => Some("path/to/certificates".to_string()),
+            "ENV_SSL_ENABLED".to_string() => Some("true".to_string()),
+    }),
+    )]
+    #[case::expands_role_not_required_no_copy_no_user_input(
+        "0.5.0",
+        &PropertyNameKind::File("env.sh".to_string()),
+        "role_1",
+        "data/test_yamls/expands_role_not_required_no_copy.yaml",
+        HashMap::new(),
+        BTreeMap::new(),
+    )]
+    fn test_get_and_expand_properties(
         #[case] version: &str,
         #[case] kind: &PropertyNameKind,
-        #[case] role: Option<&str>,
-        #[case] user_data: HashMap<String, String>,
-        #[case] expected: HashMap<String, PropertyValidationResult>,
+        #[case] role: &str,
+        #[case] path: &str,
+        #[case] user_data: HashMap<String, Option<String>>,
+        #[case] expected: BTreeMap<String, Option<String>>,
     ) {
-        let config = ProductConfigSpec::new(ConfigJsonReader::new(
-            "data/test_config_spec.json",
-            "data/test_property_spec.json",
-        ))
-        .unwrap();
+        let product_version = StackableVersion::parse(version).unwrap();
 
-        let result = config.get(version, kind, role, &user_data).unwrap();
+        let manager = ProductConfigManager::from_yaml_file(path).unwrap();
 
-        println!("Size: {}", result.len());
-        for x in &result {
-            println!("{:?}", x)
-        }
+        let result = manager
+            .get_and_expand_properties(&product_version, role, kind, user_data)
+            .unwrap();
 
         assert_eq!(result, expected);
     }
 
-    #[test]
-    fn test_product_config_result_order() {
-        let valid = PropertyValidationResult::Valid("valid".to_string());
-        let default = PropertyValidationResult::Default("default".to_string());
-        let recommended = PropertyValidationResult::RecommendedDefault("recommended".to_string());
-        let warn = PropertyValidationResult::Warn(
-            "warning".to_string(),
-            Error::PropertyNotFound {
-                property_name: PropertyName {
-                    name: "test".to_string(),
-                    kind: PropertyNameKind::File("my_config".to_string()),
-                },
-            },
-        );
-        let error = PropertyValidationResult::Error(
-            "error".to_string(),
-            Error::ConfigSpecPropertiesNotFound {
-                name: "xyz".to_string(),
-            },
-        );
+    #[rstest]
+    #[case::get_no_user_input(
+        &PropertyNameKind::File("env.sh".to_string()),
+        "role_1",
+        "data/test_yamls/validate.yaml",
+        HashMap::new(),
+        macro_to_get_result(collection!{
+            "ENV_FLOAT".to_string() => PropertyValidationResult::RecommendedDefault("50.0".to_string()),
+            "ENV_INTEGER_PORT_MIN_MAX".to_string() => PropertyValidationResult::RecommendedDefault("20000".to_string()),
+            "ENV_ENABLE_PASSWORD".to_string() => PropertyValidationResult::Valid("true".to_string()),
+            "ENV_PASSWORD".to_string() => PropertyValidationResult::Error("".to_string(), Error::PropertyValueMissing { property_name: "ENV_PASSWORD".to_string() }),
+            "ENV_ENABLE_PASSWORD".to_string() => PropertyValidationResult::Valid("true".to_string()),
+            "ENV_PROPERTY_STRING_DEPRECATED".to_string() => PropertyValidationResult::Warn("100mb".to_string(), Error::VersionDeprecated { property_name: "ENV_PROPERTY_STRING_DEPRECATED".to_string(), product_version: "0.5.0".to_string(), deprecated_version: "0.4.0".to_string() }),
+        })
+    )]
+    #[case::get_valid_float(
+        &PropertyNameKind::File("env.sh".to_string()),
+        "role_1",
+        "data/test_yamls/validate_float.yaml",
+        macro_to_hash_map(collection!{
+            "ENV_FLOAT".to_string() => Some("42.0".to_string())
+        }),
+        macro_to_get_result(collection!{
+            "ENV_FLOAT".to_string() => PropertyValidationResult::Valid("42.0".to_string()),
+        })
+    )]
+    #[case::get_recommended_float_no_user_input(
+        &PropertyNameKind::File("env.sh".to_string()),
+        "role_1",
+        "data/test_yamls/validate_float.yaml",
+        HashMap::new(),
+        macro_to_get_result(collection!{
+            "ENV_FLOAT".to_string() => PropertyValidationResult::RecommendedDefault("50.0".to_string()),
+        })
+    )]
+    #[case::get_invalid_float_bad_user_value(
+        &PropertyNameKind::File("env.sh".to_string()),
+        "role_1",
+        "data/test_yamls/validate_float.yaml",
+        macro_to_hash_map(collection!{
+            "ENV_FLOAT".to_string() => Some("CAFE".to_string())
+        }),
+        macro_to_get_result(collection!{
+            "ENV_FLOAT".to_string() => PropertyValidationResult::Error("CAFE".to_string(), Error::DatatypeNotMatching { property_name: "ENV_FLOAT".to_string(), value: "CAFE".to_string(), datatype: "f64".to_string() }),
+        })
+    )]
+    #[case::get_invalid_float_user_value_too_small(
+        &PropertyNameKind::File("env.sh".to_string()),
+        "role_1",
+        "data/test_yamls/validate_float.yaml",
+        macro_to_hash_map(collection!{
+            "ENV_FLOAT".to_string() => Some("-1".to_string())
+        }),
+        macro_to_get_result(collection!{
+            "ENV_FLOAT".to_string() => PropertyValidationResult::Error("-1".to_string(), Error::PropertyValueOutOfBounds { property_name: "ENV_FLOAT".to_string(), received: "-1".to_string(), expected: "0".to_string() }),
+        })
+    )]
+    #[case::get_invalid_float_user_value_too_high(
+        &PropertyNameKind::File("env.sh".to_string()),
+        "role_1",
+        "data/test_yamls/validate_float.yaml",
+        macro_to_hash_map(collection!{
+            "ENV_FLOAT".to_string() => Some("101".to_string())
+        }),
+        macro_to_get_result(collection!{
+        "ENV_FLOAT".to_string() => PropertyValidationResult::Error("101".to_string(), Error::PropertyValueOutOfBounds { property_name: "ENV_FLOAT".to_string(), received: "101".to_string(), expected: "100".to_string() }),
+        })
+    )]
+    #[case::get_invalid_ssl_certificate_path(
+        &PropertyNameKind::Env,
+        "role_1",
+        "data/test_yamls/validate_directory.yaml",
+        macro_to_hash_map(collection!{
+            "ENV_SSL_CERTIFICATE_PATH".to_string() => Some("CAFE".to_string())
+        }),
+        macro_to_get_result(collection!{
+            "ENV_SSL_CERTIFICATE_PATH".to_string() => PropertyValidationResult::Error("CAFE".to_string(), Error::DatatypeRegexNotMatching { property_name: "ENV_SSL_CERTIFICATE_PATH".to_string(), value: "CAFE".to_string() }),
+        })
+    )]
+    #[case::get_valid_default_certificate_path_no_user_input(
+        &PropertyNameKind::Env,
+        "role_1",
+        "data/test_yamls/validate_directory.yaml",
+        HashMap::new(),
+        macro_to_get_result(collection!{
+            "ENV_SSL_CERTIFICATE_PATH".to_string() => PropertyValidationResult::Default("path/to/certificates".to_string()),
+        })
+    )]
+    #[case::get_override_ssl_certificate_path(
+        &PropertyNameKind::File("should_not_be_found_therefore_is_an_override".to_string()),
+        "role_1",
+        "data/test_yamls/validate_directory.yaml",
+        macro_to_hash_map(collection!{
+            "ENV_SSL_CERTIFICATE_PATH".to_string() => Some("/opt/stackable/zookeeper-operator/pki".to_string())
+        }),
+        macro_to_get_result(collection!{
+            "ENV_SSL_CERTIFICATE_PATH".to_string() => PropertyValidationResult::Unknown("/opt/stackable/zookeeper-operator/pki".to_string()),
+        })
+    )]
+    #[case::get_override_ssl_certificate_path(
+        &PropertyNameKind::Env,
+        "role_1",
+        "data/test_yamls/validate_directory.yaml",
+        macro_to_hash_map(collection!{
+            "ENV_SSL_CERTIFICATE_PATH".to_string() => Some("/opt/stackable/zookeeper-operator/pki".to_string())
+        }),
+        macro_to_get_result(collection!{
+            "ENV_SSL_CERTIFICATE_PATH".to_string() => PropertyValidationResult::Valid("/opt/stackable/zookeeper-operator/pki".to_string()),
+        })
+    )]
+    #[case::get_recommended_port_no_user_input(
+        &PropertyNameKind::Env,
+        "role_1",
+        "data/test_yamls/validate_port.yaml",
+        HashMap::new(),
+        macro_to_get_result(collection!{
+            "ENV_INTEGER_PORT_MIN_MAX".to_string() => PropertyValidationResult::RecommendedDefault("20000".to_string()),
+        })
+    )]
+    #[case::get_port_user_value_too_small(
+        &PropertyNameKind::Env,
+        "role_1",
+        "data/test_yamls/validate_port.yaml",
+        macro_to_hash_map(collection!{
+            "ENV_INTEGER_PORT_MIN_MAX".to_string() => Some("42".to_string())
+        }),
+        macro_to_get_result(collection!{
+            "ENV_INTEGER_PORT_MIN_MAX".to_string() => PropertyValidationResult::Error("42".to_string(), Error::PropertyValueOutOfBounds { property_name: "ENV_INTEGER_PORT_MIN_MAX".to_string(), received: "42".to_string(), expected: "1024".to_string() })
+        })
+    )]
+    #[case::get_port_user_value_too_high(
+        &PropertyNameKind::Env,
+        "role_1",
+        "data/test_yamls/validate_port.yaml",
+        macro_to_hash_map(collection!{
+            "ENV_INTEGER_PORT_MIN_MAX".to_string() => Some("65536".to_string())
+        }),
+        macro_to_get_result(collection!{
+        "ENV_INTEGER_PORT_MIN_MAX".to_string() => PropertyValidationResult::Error("65536".to_string(), Error::PropertyValueOutOfBounds { property_name: "ENV_INTEGER_PORT_MIN_MAX".to_string(), received: "65536".to_string(), expected: "65535".to_string() })
+        })
+    )]
+    #[case::get_port_user_value_invalid(
+        &PropertyNameKind::Env,
+        "role_1",
+        "data/test_yamls/validate_port.yaml",
+        macro_to_hash_map(collection!{
+            "ENV_INTEGER_PORT_MIN_MAX".to_string() => Some("invalid".to_string())
+        }),
+        macro_to_get_result(collection!{
+            "ENV_INTEGER_PORT_MIN_MAX".to_string() => PropertyValidationResult::Error("invalid".to_string(), Error::DatatypeNotMatching { property_name: "ENV_INTEGER_PORT_MIN_MAX".to_string(), value: "invalid".to_string(), datatype: "i64".to_string() })
+        })
+    )]
+    #[case::get_port_user_value_valid(
+        &PropertyNameKind::Env,
+        "role_1",
+        "data/test_yamls/validate_port.yaml",
+        macro_to_hash_map(collection!{
+            "ENV_INTEGER_PORT_MIN_MAX".to_string() => Some("1024".to_string()),
+        }),
+        macro_to_get_result(collection!{
+            "ENV_INTEGER_PORT_MIN_MAX".to_string() => PropertyValidationResult::Valid("1024".to_string()),
+        })
+    )]
+    fn test_get(
+        #[case] kind: &PropertyNameKind,
+        #[case] role: &str,
+        #[case] path: &str,
+        #[case] user_data: HashMap<String, Option<String>>,
+        #[case] expected: BTreeMap<String, PropertyValidationResult>,
+    ) -> ValidationResult<()> {
+        let manager = ProductConfigManager::from_yaml_file(path).unwrap();
 
-        assert!(valid > recommended);
-        assert!(valid > default);
-        assert!(valid < error);
+        let result = manager.get("0.5.0", role, kind, user_data)?;
 
-        assert!(warn < error);
-        assert!(error > warn);
+        assert_eq!(result, expected);
+
+        Ok(())
     }
 }

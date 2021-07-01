@@ -1,0 +1,288 @@
+version: 0.1.0
+spec:
+  units:
+    - unit: &unitUrl
+        name: "url"
+        regex: "^((spark|https?|ftp|file)://)?[-a-zA-Z0-9+&@#}/%?=~_|!:,.;]*[-a-zA-Z0-9+&@#/%=~_|]"
+        examples:
+          - "https://www.stackable.de/blog/"
+    - unit: &unitUri
+        name: "uri"
+        regex: "^(([^:/?#]+):)?(//([^/?#]*))?([^?#]*)(\\?([^#]*))?(#(.*))?"
+        examples:
+          - "ldap://[2001:db8::7]/c=GB?objectClass?one"
+        comment: "Specified in https://tools.ietf.org/html/rfc3986#appendix-B"
+    - unit: &unitDirectory
+        name: "directory"
+        regex: "^/|(/[\\w-]+)+$"
+        examples:
+          - "/tmp/xyz"
+    - unit: &unitFile
+        name: "file"
+        regex: "^/|(/[\\w-]+)+$"
+        "examples":
+          - "/tmp/xyz"
+    - unit: &unitPassword
+        name: "password"
+        regex: "^[a-zA-Z]\\w{5,20}$"
+    - unit: &unitIp
+        name: "ip"
+        regex: "^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$"
+    - unit: &unitPort
+        name: "port"
+        regex: "^([0-9]{1,4}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])$"
+    - unit: &unitMemory
+        name: "memory"
+        regex: "(^\\p{N}+)(?:\\s*)((?:b|k|m|g|t|p|kb|mb|gb|tb|pb)\\b$)"
+        examples:
+          - "1024b"
+          - "1024kb"
+          - "500m"
+          - "1g"
+    - unit: &unitTime
+        name: "time"
+        regex: "(^\\p{N}+)(?:\\s*)((?:ns|mus|ms|s|m|h|d)\\b$)"
+        examples:
+          - "100ms"
+          - "60m"
+          - "12h"
+    - unit: &unitNumber
+        name: "number"
+        regex: "^-?[0-9][0-9,\\.]+$"
+
+properties:
+  - property: &integerPortMinMax
+      propertyNames:
+        - name: "ENV_INTEGER_PORT_MIN_MAX"
+          kind:
+            type: "file"
+            file: "env.sh"
+        - name: "conf.integer.port.min.max"
+          kind:
+            type: "file"
+            file: "my.config"
+      datatype:
+        type: "integer"
+        min: "1"
+        max: "65535"
+        unit: *unitPort
+      defaultValues:
+        - fromVersion: "0.5.0"
+          value: "10000"
+      recommendedValues:
+        - fromVersion: "0.5.0"
+          toVersion: "0.9.11"
+          value: "20000"
+        - fromVersion: "1.0.0"
+          value: "30000"
+      roles:
+        - name: "role_1"
+          required: true
+        - name: "role_2"
+          required: false
+      asOfVersion: "0.5.0"
+  - property: &float
+      propertyNames:
+        - name: "ENV_FLOAT"
+          kind:
+            type: "file"
+            file: "env.sh"
+        - name: "conf.float"
+          kind:
+            type: "file"
+            file: "my.config"
+      datatype:
+        type: "float"
+        min: "0.0"
+        max: "100.0"
+      defaultValues:
+         - fromVersion: "0.5.0"
+           value: "40.123"
+      recommendedValues:
+        - fromVersion": "0.5.0"
+          toVersion": "0.9.11"
+          value: "50.0"
+        - fromVersion: "1.0.0"
+          value: "55.0"
+      roles:
+        - name: "role_1"
+          required: true
+        - name: "role_2"
+          required: false
+      asOfVersion: "0.5.0"
+  - property: &propertyStringMemory
+      propertyNames:
+        - name: "ENV_PROPERTY_STRING_MEMORY"
+          kind:
+            type: "file"
+            file: "env.sh"
+        - name: "conf.property.string.memory"
+          kind:
+            type: "file"
+            file: "my.config"
+      datatype:
+        type: "string"
+        unit: *unitMemory
+      defaultValues:
+        - fromVersion: "0.5.0"
+          toVersion: "1.0.0"
+          value: "256m"
+        - fromVersion: "1.0.0"
+          value: "512m"
+      recommendedValues:
+        - fromVersion: "0.5.0"
+          toVersion: "0.7.22"
+          value: "1g"
+        - fromVersion: "1.0.0"
+          value: "2g"
+      roles:
+        - name: "role_1"
+          required: false
+      asOfVersion: "0.5.0"
+  - property: &propertyStringDeprecated
+      propertyNames:
+        - name: "ENV_PROPERTY_STRING_DEPRECATED"
+          kind:
+            type: "file"
+            file: "env.sh"
+        - name: "conf.property.string.deprecated"
+          kind:
+            type: "file"
+            file: "my.config"
+      datatype:
+        type: "string"
+        unit: *unitMemory
+      defaultValues:
+        - fromVersion: "0.1.0"
+          value: "100mb"
+      roles:
+        - name: "role_1"
+          required: true
+        - name: "role_2"
+          required: false
+      asOfVersion: "0.1.0"
+      deprecatedSince: "0.4.0"
+  - property: &allowedValues
+      propertyNames:
+        - name: "ENV_ALLOWED_VALUES"
+          kind:
+            type: "file"
+            file: "env.sh"
+        - name: "conf.allowed.values"
+          kind:
+            type: "file"
+            file: "my.config"
+      defaultValues:
+        - fromVersion: "0.1.0"
+          value: "allowed_value1"
+      roles:
+        - name: "role_1"
+          required: false
+        - name: "role_2"
+          required: true
+      datatype:
+        type: "string"
+        max: "255"
+      allowedValues:
+        - "allowed_value1"
+        - "allowed_value2"
+        - "allowed_value3"
+      asOfVersion: "0.1.0"
+  - property: &sslEnabled
+      propertyNames:
+        - name: "ENV_SSL_ENABLED"
+          kind:
+            type: "file"
+            file: "env.sh"
+        - name: "conf.ssl.enabled"
+          kind:
+            type: "file"
+            file: "my.config"
+      datatype:
+        type: "bool"
+      defaultValues":
+        - fromVersion: "0.5.0"
+          value: "false"
+      recommendedValues":
+        - fromVersion: "0.5.0"
+          value: "true"
+      roles:
+        - name: "role_1"
+          required: false
+      asOfVersion: "0.5.0"
+  - property: &sslCertificatePath
+      propertyNames:
+        - name: "ENV_SSL_CERTIFICATE_PATH"
+          kind:
+            type: "file"
+            file: "env.sh"
+        - name: "conf.ssl.certificate.path"
+          kind:
+            type: "file"
+            file: "my.config"
+      defaultValues:
+        - fromVersion: "0.5.0"
+          value: "path/to/certificates"
+      roles:
+        - name: "role_1"
+          required: false
+      datatype:
+        type: "string"
+        unit: *unitDirectory
+      asOfVersion: "0.5.0"
+  - property: &enableSecurity
+      propertyNames:
+        - name: "ENV_ENABLE_SECURITY"
+          kind:
+            type: "file"
+            file: "env.sh"
+        - name: "conf.enable.security"
+          kind:
+            type: "file"
+            file: "my.config"
+      roles:
+        - name: "role_1"
+          required: false
+          noCopy: true
+      datatype:
+        type: "bool"
+      asOfVersion: "0.5.0"
+      expandsTo:
+        - property: *sslEnabled
+          value: "true"
+        - property: *sslCertificatePath
+  - property: &enablePassword
+      propertyNames:
+        - name: "ENV_ENABLE_PASSWORD"
+          kind:
+            type: "file"
+            file: "env.sh"
+        - name: "conf.enable.password"
+          kind:
+            type: "file"
+            file: "my.config"
+      roles:
+        - name: "role_1"
+          required: false
+      datatype:
+        type: "bool"
+      asOfVersion: "0.5.0"
+  - property: &password
+      propertyNames:
+        - name: "ENV_PASSWORD"
+          kind:
+            type: "file"
+            file: "env.sh"
+        - name: "conf.password"
+          kind:
+            type: "file"
+            file: "my.config"
+      roles:
+        - name: "role_1"
+          required: true
+      datatype:
+        type: "string"
+      asOfVersion: "0.5.0"
+      expandsTo:
+        - property: *enablePassword
+          value: "true"

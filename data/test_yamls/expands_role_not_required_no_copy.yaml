@@ -1,0 +1,72 @@
+version: 0.1.0
+spec:
+  units:
+    - unit: &unitDirectory
+        name: "directory"
+        regex: "^/|(/[\\w-]+)+$"
+        examples:
+          - "/tmp/xyz"
+properties:
+  - property: &sslEnabled
+      propertyNames:
+        - name: "ENV_SSL_ENABLED"
+          kind:
+            type: "file"
+            file: "env.sh"
+        - name: "conf.ssl.enabled"
+          kind:
+            type: "file"
+            file: "my.config"
+      datatype:
+        type: "bool"
+      defaultValues":
+        - fromVersion: "0.5.0"
+          value: "false"
+      recommendedValues":
+        - fromVersion: "0.5.0"
+          value: "true"
+      roles:
+        - name: "role_1"
+          required: false
+      asOfVersion: "0.5.0"
+  - property: &sslCertificatePath
+      propertyNames:
+        - name: "ENV_SSL_CERTIFICATE_PATH"
+          kind:
+            type: "file"
+            file: "env.sh"
+        - name: "conf.ssl.certificate.path"
+          kind:
+            type: "file"
+            file: "my.config"
+      defaultValues:
+        - fromVersion: "0.5.0"
+          value: "path/to/certificates"
+      roles:
+        - name: "role_1"
+          required: false
+      datatype:
+        type: "string"
+        unit: *unitDirectory
+      asOfVersion: "0.5.0"
+  - property: &enableSecurity
+      propertyNames:
+        - name: "ENV_ENABLE_SECURITY"
+          kind:
+            type: "file"
+            file: "env.sh"
+        - name: "conf.enable.security"
+          kind:
+            type: "file"
+            file: "my.config"
+      roles:
+        - name: "role_1"
+          required: false
+          noCopy: true
+      datatype:
+        type: "bool"
+      asOfVersion: "0.5.0"
+      expandsTo:
+        - property: *sslEnabled
+          value: "true"
+        - property: *sslCertificatePath

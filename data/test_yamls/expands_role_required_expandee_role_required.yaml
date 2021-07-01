@@ -1,0 +1,39 @@
+version: 0.1.0
+spec:
+  units: []
+properties:
+  - property: &enablePassword
+      propertyNames:
+        - name: "ENV_ENABLE_PASSWORD"
+          kind:
+            type: "file"
+            file: "env.sh"
+        - name: "conf.enable.password"
+          kind:
+            type: "file"
+            file: "my.config"
+      roles:
+        - name: "role_1"
+          required: true
+      datatype:
+        type: "bool"
+      asOfVersion: "0.5.0"
+  - property: &password
+      propertyNames:
+        - name: "ENV_PASSWORD"
+          kind:
+            type: "file"
+            file: "env.sh"
+        - name: "conf.password"
+          kind:
+            type: "file"
+            file: "my.config"
+      roles:
+        - name: "role_1"
+          required: true
+      datatype:
+        type: "string"
+      asOfVersion: "0.5.0"
+      expandsTo:
+        - property: *enablePassword
+          value: "true"

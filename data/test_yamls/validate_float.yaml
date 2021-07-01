@@ -1,0 +1,34 @@
+version: 0.1.0
+spec:
+  units: []
+
+properties:
+   - property: &float
+      propertyNames:
+        - name: "ENV_FLOAT"
+          kind:
+            type: "file"
+            file: "env.sh"
+        - name: "conf.float"
+          kind:
+            type: "file"
+            file: "my.config"
+      datatype:
+        type: "float"
+        min: "0.0"
+        max: "100.0"
+      defaultValues:
+         - fromVersion: "0.5.0"
+           value: "40.123"
+      recommendedValues:
+        - fromVersion": "0.5.0"
+          toVersion": "0.9.11"
+          value: "50.0"
+        - fromVersion: "1.0.0"
+          value: "55.0"
+      roles:
+        - name: "role_1"
+          required: true
+        - name: "role_2"
+          required: false
+      asOfVersion: "0.5.0"

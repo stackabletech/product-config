@@ -1,218 +1,58 @@
-use crate::error::Error;
-use crate::types::{
-    PropertyDependency, PropertyName, PropertyNameKind, PropertySpec, PropertyValueSpec,
-};
+use crate::types::{PropertyNameKind, PropertySpec};
 use crate::validation::ValidationResult;
 use semver::Version;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
+use std::hash::Hash;
 
-/// Automatically retrieve and validate config properties from the property spec that:
-/// - match the provided kind (e.g. Conf(my.config))
-/// - match the role and are required
-/// - are available for the current product version
-/// - have dependencies dependency with a provided value or property that has recommended value
-///
-/// # Arguments
-///
-/// * `property_spec` - map with property name as key and the corresponding property spec as value
-/// * `kind` - property name kind provided by the user
-/// * `role` - the role required / used for the property
-/// * `product_version` - the provided product version
-///
-pub(crate) fn get_matching_properties(
-    property_spec: &HashMap<PropertyName, PropertySpec>,
-    kind: &PropertyNameKind,
-    role: Option<&str>,
-    product_version: &Version,
-) -> ValidationResult<HashMap<String, String>> {
-    let mut properties = HashMap::new();
-
-    for (property_name, spec) in property_spec {
-        // ignore this property if kind does not match
-        // TODO: improve performance by sorting properties via kind
-        if &property_name.kind != kind {
-            continue;
-        }
-
-        // Ignore this configuration property if it is only available (specified via `as_of_version`)
-        // in later versions than the one we're checking against.
-        if semver_parse(spec.as_of_version.as_str())? > *product_version {
-            continue;
-        }
-
-        // ignore completely if role is None
-        // ignore this property if role does not match or is not required
-        if let Some(property_roles) = &spec.roles {
-            for property_role in property_roles {
-                // role found?
-                if Some(property_role.name.as_str()) == role && property_role.required {
-                    // check for recommended value and matching version
-                    if let Some(recommended) = &spec.recommended_values {
-                        let property_value = get_property_value_for_version(
-                            property_name,
-                            recommended,
-                            product_version,
-                        )?;
-
-                        properties.insert(property_name.name.clone(), property_value.value);
-
-                        if let Some(property_dependencies) = &spec.depends_on {
-                            let dependencies = get_config_dependencies_and_values(
-                                property_spec,
-                                product_version,
-                                property_name,
-                                &property_dependencies,
-                            )?;
-
-                            properties.extend(dependencies);
-                        }
-                    }
-                }
-            }
+/// Helper to check if any given key is contained in a map.
+pub(crate) fn hashmap_contains_any_key<K, V>(hm: &HashMap<K, V>, possible_keys: &[K]) -> bool
+where
+    K: Hash + Eq,
+{
+    for key in possible_keys {
+        if hm.contains_key(key) {
+            return true;
         }
     }
-
-    Ok(properties)
+    false
 }
 
-/// Collect all dependencies that are required based on user properties
+/// Checks if the provided property has other properties which need to be expanded / added in
+/// order to work correctly. If any expanded properties are available, they are checked for
+/// a fitting role and version and added to the result if role and version are matching.
 ///
 /// # Arguments
-///
-/// * `property_spec` - map with property name as key and the corresponding property spec as value
-/// * `user_config` - map with the user config names and according values
-/// * `version` - the provided product version
+/// * `property` - the property that may have other properties to expand to
+/// * `version` - the current product version
+/// * `role` - property role provided by the user
 /// * `kind` - property name kind provided by the user
-///
-pub(crate) fn get_matching_dependencies(
-    property_spec: &HashMap<PropertyName, PropertySpec>,
-    user_config: &HashMap<String, String>,
+pub(crate) fn expand_properties(
+    property: &PropertySpec,
     version: &Version,
+    role: &str,
     kind: &PropertyNameKind,
-) -> ValidationResult<HashMap<String, String>> {
-    let mut user_dependencies = HashMap::new();
-    for name in user_config.keys() {
-        let property_name = PropertyName {
-            name: name.clone(),
-            kind: kind.clone(),
-        };
-
-        if let Some(property) = property_spec.get(&property_name) {
-            if let Some(dependencies) = &property.depends_on {
-                user_dependencies.extend(get_config_dependencies_and_values(
-                    property_spec,
-                    version,
-                    &property_name,
-                    dependencies,
-                )?);
+) -> ValidationResult<BTreeMap<String, Option<String>>> {
+    let mut result = BTreeMap::new();
+    if let Some(expands_to) = &property.expands_to {
+        for to_expand in expands_to {
+            if !to_expand.property.has_role(role) {
+                continue;
             }
-        }
-    }
 
-    Ok(user_dependencies)
-}
+            if !to_expand.property.is_version_supported(version)? {
+                continue;
+            }
 
-/// Collect all dependencies for required properties and extract a value from either the dependency
-/// itself, or if not available the recommended value of the property dependency
-///
-/// # Arguments
-///
-/// * `property_spec` - map with PropertyName as key and the corresponding PropertySpec as value
-/// * `product_version` - the provided product version
-/// * `property_name` - name of the property
-/// * `property_dependencies` - the dependencies of the property to check
-///
-fn get_config_dependencies_and_values(
-    property_spec: &HashMap<PropertyName, PropertySpec>,
-    product_version: &Version,
-    property_name: &PropertyName,
-    property_dependencies: &[PropertyDependency],
-) -> ValidationResult<HashMap<String, String>> {
-    let mut dependencies = HashMap::new();
-    for property_dependency in property_dependencies {
-        for property_dependency_name in &property_dependency.property_names {
-            // the dependency should not differ in the kind
-            if property_name.kind == property_dependency_name.kind {
-                // if the dependency has a proposed value we are done
-                if let Some(dependency_value) = &property_dependency.value {
-                    dependencies.insert(
-                        property_dependency_name.name.clone(),
-                        dependency_value.clone(),
-                    );
-                }
-                // we check the dependency for a recommended value
-                if let Some(dependency_property) = property_spec.get(property_dependency_name) {
-                    if let Some(recommended) = &dependency_property.recommended_values {
-                        let recommended_value = get_property_value_for_version(
-                            property_name,
-                            recommended,
-                            product_version,
-                        )?;
-                        dependencies.insert(
-                            property_dependency_name.name.clone(),
-                            recommended_value.value,
-                        );
-                    }
+            if let Some(name) = to_expand.property.name_from_kind(kind) {
+                if to_expand.value.is_some() {
+                    result.insert(name, to_expand.value.clone());
+                } else if let Some((_, value)) =
+                    to_expand.property.recommended_or_default(version, kind)
+                {
+                    result.insert(name, value);
                 }
             }
         }
     }
-
-    Ok(dependencies)
-}
-
-/// Extract the provided value from recommended / default values that matches the product version.
-/// Check if there exists a recommended / default value that has a range (if provided) with
-/// from_version and to_version that includes the product version. E.g. if from_version is 1.0.0
-/// and to_version is 1.9.99, we have a value for product version 1.5.0 but not 2.0.0.
-///
-/// # Arguments
-///
-/// * `property_name` - name of the property
-/// * `property_values` - list of property values and their respective versions
-/// * `product_version` - the product version
-///
-pub(crate) fn get_property_value_for_version(
-    property_name: &PropertyName,
-    property_values: &[PropertyValueSpec],
-    product_version: &Version,
-) -> ValidationResult<PropertyValueSpec> {
-    for value in property_values {
-        if let Some(from) = &value.from_version {
-            let from_version = semver_parse(from)?;
-
-            if from_version > *product_version {
-                continue;
-            }
-        }
-
-        if let Some(to) = &value.to_version {
-            let to_version = semver_parse(to)?;
-
-            if to_version < *product_version {
-                continue;
-            }
-        }
-
-        return Ok(value.clone());
-    }
-
-    Err(Error::PropertySpecValueMissingForVersion {
-        property_name: property_name.clone(),
-        property_values: Vec::from(property_values),
-        version: product_version.to_string(),
-    })
-}
-
-/// This is a helper method to merge SemVer errors and the product config errors. Since
-/// SemVer 1.0.X we can no longer use "thiserror" in combination with "#[from]" on the SemVer
-/// error (Clone, PartialOrd, PartialEq traits are no longer valid). Therefore we just pass
-/// the error string of the SemVer error into our product config error.
-pub(crate) fn semver_parse(version: &str) -> ValidationResult<Version> {
-    match Version::parse(version) {
-        Ok(version) => Ok(version),
-        Err(err) => Err(Error::InvalidVersion {
-            semver_error: err.to_string(),
-        }),
-    }
+    Ok(result)
 }

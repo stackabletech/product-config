@@ -1,4 +1,4 @@
-use crate::types::{PropertyDependency, PropertyValueSpec};
+use crate::types::PropertyValueSpec;
 use crate::PropertyName;
 
 #[derive(thiserror::Error, Clone, Debug, PartialOrd, PartialEq)]
@@ -6,11 +6,14 @@ pub enum Error {
     #[error("File not found: {file_name}")]
     FileNotFound { file_name: String },
 
-    #[error("Could not parse file: {file_name}: {reason}")]
-    FileNotParsable { file_name: String, reason: String },
+    #[error("Could not parse yaml file - {file}: {reason}")]
+    YamlFileNotParsable { file: String, reason: String },
 
-    #[error("Invalid SemVer version: {semver_error}")]
-    InvalidVersion { semver_error: String },
+    #[error("Could not parse yaml - {content}: {reason}")]
+    YamlNotParsable { content: String, reason: String },
+
+    #[error("Invalid SemVer version: {reason}")]
+    InvalidVersion { reason: String },
 
     #[error("[{property_name}]: current product version is '{product_version}' -> property not supported; available from version '{required_version}'")]
     VersionNotSupported {
@@ -21,7 +24,7 @@ pub enum Error {
 
     #[error("[{property_name}]: current product version is '{product_version}' -> property deprecated since version '{deprecated_version}'")]
     VersionDeprecated {
-        property_name: PropertyName,
+        property_name: String,
         product_version: String,
         deprecated_version: String,
     },
@@ -43,13 +46,13 @@ pub enum Error {
 
     #[error("[{0}]: provided value '{received}' violates min/max bound '{expected}'")]
     PropertyValueOutOfBounds {
-        property_name: PropertyName,
+        property_name: String,
         received: String,
         expected: String,
     },
 
-    #[error("[{property_name}]: provided config value missing")]
-    PropertyValueMissing { property_name: PropertyName },
+    #[error("[{property_name}]: config value missing for required property")]
+    PropertyValueMissing { property_name: String },
 
     #[error("[{property_name}]: provided property value(s) missing for version '{version}'. Got: {property_values:?}")]
     PropertySpecValueMissingForVersion {
@@ -60,21 +63,21 @@ pub enum Error {
 
     #[error("[{property_name}]: value '{value}' not in allowed values: {allowed_values:?}")]
     PropertyValueNotInAllowedValues {
-        property_name: PropertyName,
+        property_name: String,
         value: String,
         allowed_values: Vec<String>,
     },
 
     #[error("[{property_name}]: value '{value}' not of specified type: '{datatype}'")]
     DatatypeNotMatching {
-        property_name: PropertyName,
+        property_name: String,
         value: String,
         datatype: String,
     },
 
     #[error("[{property_name}]: value '{value}' does not match regex")]
     DatatypeRegexNotMatching {
-        property_name: PropertyName,
+        property_name: String,
         value: String,
     },
 
@@ -91,45 +94,5 @@ pub enum Error {
     UnitSettingNotFound {
         property_name: PropertyName,
         unit: String,
-    },
-
-    #[error("[{property_name}]: required dependency not provided: '{dependency:?}'")]
-    PropertyDependencyMissing {
-        property_name: PropertyName,
-        dependency: Vec<PropertyName>,
-    },
-
-    #[error(
-        "[{property_name}]: dependency '{dependency}' requires no values, but was set to '{user_value}'"
-    )]
-    PropertyDependencyUserValueNotRequired {
-        property_name: PropertyName,
-        dependency: String,
-        user_value: String,
-    },
-
-    #[error(
-        "[{property_name}]: dependency '{dependency}' requires value '{required_value}' to be set"
-    )]
-    PropertyDependencyUserValueMissing {
-        property_name: PropertyName,
-        dependency: String,
-        required_value: String,
-    },
-
-    #[error(
-        "[{property_name}]: provided value '{user_value}' does not match required value '{required_value}' for dependency '{dependency}'"
-    )]
-    PropertyDependencyValueInvalid {
-        property_name: PropertyName,
-        dependency: String,
-        user_value: String,
-        required_value: String,
-    },
-
-    #[error("[{property_name}]: no provided or recommended values in dependency '{dependency:?}'")]
-    PropertyDependencyValueMissing {
-        property_name: PropertyName,
-        dependency: PropertyDependency,
     },
 }
