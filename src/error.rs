@@ -12,8 +12,8 @@ pub enum Error {
     #[error("Could not parse yaml - {content}: {reason}")]
     YamlNotParsable { content: String, reason: String },
 
-    #[error("Invalid SemVer version: {semver_error}")]
-    InvalidVersion { semver_error: String },
+    #[error("Invalid SemVer version: {reason}")]
+    InvalidVersion { reason: String },
 
     #[error("[{property_name}]: current product version is '{product_version}' -> property not supported; available from version '{required_version}'")]
     VersionNotSupported {

@@ -6,10 +6,11 @@ use schemars::gen::SchemaGenerator;
 use schemars::schema::Schema;
 use schemars::JsonSchema;
 use semver::Version;
-use serde::{de, Deserialize, Deserializer};
+use serde::{de, Deserialize, Deserializer, Serializer};
 
-use crate::util::semver_parse;
+use crate::error;
 use crate::validation::ValidationResult;
+use std::ops::Deref;
 
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialOrd, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -53,11 +54,16 @@ pub struct PropertySpec {
     pub property_names: Vec<PropertyName>,
     pub datatype: Datatype,
     pub roles: Vec<Role>,
-    pub as_of_version: String,
+    #[serde(deserialize_with = "version_from_string")]
+    #[serde(serialize_with = "version_to_string")]
+    pub as_of_version: StackableVersion,
     pub default_values: Option<Vec<PropertyValueSpec>>,
     pub recommended_values: Option<Vec<PropertyValueSpec>>,
     pub allowed_values: Option<Vec<String>>,
-    pub deprecated_since: Option<String>,
+    #[serde(default)]
+    #[serde(deserialize_with = "optional_version_from_string")]
+    #[serde(serialize_with = "optional_version_to_string")]
+    pub deprecated_since: Option<StackableVersion>,
     pub deprecated_for: Option<Vec<String>>,
     pub expands_to: Option<Vec<PropertyExpansion>>,
     pub restart_required: Option<bool>,
@@ -94,17 +100,17 @@ impl PropertySpec {
     pub fn filter_value(&self, version: &Version, values: &[PropertyValueSpec]) -> Option<String> {
         for value in values {
             if let Some(from) = &value.from_version {
-                let from_version = semver_parse(from).unwrap();
+                let from_version = from.deref();
 
-                if from_version > *version {
+                if from_version > version {
                     continue;
                 }
             }
 
             if let Some(to) = &value.to_version {
-                let to_version = semver_parse(to).unwrap();
+                let to_version = to.deref();
 
-                if to_version < *version {
+                if to_version < version {
                     continue;
                 }
             }
@@ -157,13 +163,13 @@ impl PropertySpec {
 
     /// Returns true if the product_version is greater or equal the as_of_version of the property.
     pub fn is_version_supported(&self, product_version: &Version) -> ValidationResult<bool> {
-        Ok(semver_parse(&self.as_of_version)? <= *product_version)
+        Ok(self.as_of_version.deref() <= product_version)
     }
 
     /// Returns true if the product_version is greater or equal the deprecated_since of the property.
     pub fn is_version_deprecated(&self, product_version: &Version) -> ValidationResult<bool> {
         if let Some(deprecated_since) = &self.deprecated_since {
-            return Ok(semver_parse(deprecated_since)? <= *product_version);
+            return Ok(deprecated_since.deref() <= product_version);
         }
         Ok(false)
     }
@@ -220,16 +226,80 @@ pub struct Unit {
     pub comment: Option<String>,
 }
 
-fn regex_from_string<'de, D>(deserializer: D) -> Result<StackableRegex, D::Error>
+/// This is a workaround to deserialize a string directly into a parsed SemVer version and to
+/// wrap SemVer in case of using another library.
+#[derive(Clone, Debug, Eq, PartialOrd, PartialEq)]
+pub struct StackableVersion {
+    version: Version,
+}
+
+impl StackableVersion {
+    pub fn parse(version: &str) -> ValidationResult<Self> {
+        Ok(StackableVersion {
+            version: Version::parse(version).map_err(|err| error::Error::InvalidVersion {
+                reason: err.to_string(),
+            })?,
+        })
+    }
+}
+
+impl ops::Deref for StackableVersion {
+    type Target = Version;
+    fn deref(&self) -> &Version {
+        &self.version
+    }
+}
+
+pub fn version_to_string<S>(version: &StackableVersion, s: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    s.serialize_str(&version.deref().to_string())
+}
+
+pub fn optional_version_to_string<S>(
+    version: &Option<StackableVersion>,
+    s: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    if let Some(ref v) = *version {
+        return s.serialize_str(&v.deref().to_string());
+    }
+    s.serialize_none()
+}
+
+fn version_from_string<'de, D>(deserializer: D) -> Result<StackableVersion, D::Error>
 where
     D: Deserializer<'de>,
 {
     let s = String::deserialize(deserializer)?;
-    let r = Regex::new(&s).map_err(de::Error::custom)?;
-    Ok(StackableRegex {
-        expression: s,
-        compiled: r,
-    })
+    StackableVersion::parse(&s).map_err(de::Error::custom)
+}
+
+fn optional_version_from_string<'de, D>(
+    deserializer: D,
+) -> Result<Option<StackableVersion>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s: Option<String> = Option::deserialize(deserializer)?;
+    if let Some(val) = s {
+        return Ok(Some(
+            StackableVersion::parse(&val).map_err(de::Error::custom)?,
+        ));
+    }
+    Ok(None)
+}
+
+impl JsonSchema for StackableVersion {
+    fn schema_name() -> String {
+        todo!()
+    }
+    fn json_schema(_gen: &mut SchemaGenerator) -> Schema {
+        todo!()
+    }
 }
 
 /// This is a workaround to deserialize a string directly into a compiled regex.
@@ -242,6 +312,18 @@ where
 pub struct StackableRegex {
     pub expression: String,
     compiled: Regex,
+}
+
+fn regex_from_string<'de, D>(deserializer: D) -> Result<StackableRegex, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    let r = Regex::new(&s).map_err(de::Error::custom)?;
+    Ok(StackableRegex {
+        expression: s,
+        compiled: r,
+    })
 }
 
 impl ops::Deref for StackableRegex {
@@ -278,8 +360,14 @@ impl JsonSchema for StackableRegex {
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialOrd, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct PropertyValueSpec {
-    pub from_version: Option<String>,
-    pub to_version: Option<String>,
+    #[serde(default)]
+    #[serde(deserialize_with = "optional_version_from_string")]
+    #[serde(serialize_with = "optional_version_to_string")]
+    pub from_version: Option<StackableVersion>,
+    #[serde(default)]
+    #[serde(deserialize_with = "optional_version_from_string")]
+    #[serde(serialize_with = "optional_version_to_string")]
+    pub to_version: Option<StackableVersion>,
     pub value: String,
 }
 

@@ -18,9 +18,10 @@ use std::{fs, str};
 use semver::Version;
 
 use crate::error::Error;
-use crate::types::{ProductConfig, PropertyName, PropertyNameKind, PropertySpec};
-use crate::util::{expand_properties, semver_parse};
+use crate::types::{ProductConfig, PropertyName, PropertyNameKind, PropertySpec, StackableVersion};
+use crate::util::expand_properties;
 use crate::validation::{check_allowed_values, ValidationResult};
+use std::ops::Deref;
 use std::str::FromStr;
 
 pub mod error;
@@ -135,7 +136,7 @@ impl ProductConfigManager {
         kind: &PropertyNameKind,
         user_config: HashMap<String, Option<String>>,
     ) -> ValidationResult<BTreeMap<String, PropertyValidationResult>> {
-        let product_version = semver_parse(version)?;
+        let product_version = StackableVersion::parse(version)?;
 
         // merge provided user properties with extracted property spec via role / kind and
         // dependencies to be validated later.
@@ -273,7 +274,11 @@ impl ProductConfigManager {
                                     product_version: version.to_string(),
                                     // we would not reach here if deprecated_since is None
                                     // so we can just unwrap.
-                                    deprecated_version: property.deprecated_since.unwrap(),
+                                    deprecated_version: property
+                                        .deprecated_since
+                                        .unwrap()
+                                        .deref()
+                                        .to_string(),
                                 },
                             ),
                         );
@@ -380,7 +385,6 @@ mod tests {
     use super::*;
     use crate::error::Error;
     use crate::types::PropertyNameKind;
-    use crate::util::semver_parse;
     use crate::ProductConfigManager;
     use rstest::*;
 
@@ -531,7 +535,7 @@ mod tests {
         #[case] user_data: HashMap<String, Option<String>>,
         #[case] expected: BTreeMap<String, Option<String>>,
     ) {
-        let product_version = semver_parse(version).unwrap();
+        let product_version = StackableVersion::parse(version).unwrap();
 
         let manager = ProductConfigManager::from_yaml_file(path).unwrap();
 
