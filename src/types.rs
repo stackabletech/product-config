@@ -232,8 +232,8 @@ where
     })
 }
 
-/// This is a workaround to deserialize a String directly into a compiled regex.
-/// Regex does not implement Eq, PartialOrd, PartialEq and JsonSchema.
+/// This is a workaround to deserialize a string directly into a compiled regex.
+/// It is needed because Regex does not implement Eq, PartialOrd, PartialEq and JsonSchema.
 /// The field "compiled" should be hidden and only kept in memory. Never to be Serialized
 /// or explicitly Deserialized.
 // TODO: When moving to custom resources we need to properly implement JsonSchema
