@@ -218,7 +218,7 @@ impl ProductConfigManager {
         result
     }
 
-    /// Validates the given [merged_properties] by performing the following actions:
+    /// Validates the given `merged_properties` by performing the following actions:
     /// * syntax checks on the values
     /// * mandatory checks (if a property is required for the given role and version)
     /// * comparison checks against the recommended and default values
