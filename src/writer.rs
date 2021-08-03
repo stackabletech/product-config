@@ -40,15 +40,12 @@ where
 {
     let mut writer = PropertiesWriter::new(writer);
     for (k, v) in properties {
-        if let Some(value) = v {
-            if value.is_empty() {
-                writer.write(&k, "\"\"")?;
-            } else {
-                writer.write(&k, &value)?;
-            }
-        } else {
-            writer.write(&k, "")?;
-        }
+        let property_value = match v {
+            Some(value) if value.is_empty() => "\"\"",
+            Some(value) => value,
+            None => "",
+        };
+        writer.write(k, property_value)?;
     }
 
     writer.flush()?;
