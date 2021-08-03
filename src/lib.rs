@@ -208,7 +208,7 @@ impl ProductConfigManager {
         let mut result = BTreeMap::new();
 
         for (name, value) in properties {
-            if let Some(prop) = self.find_property(&name, role, kind, version) {
+            if let Some(prop) = self.find_property(name, role, kind, version) {
                 if prop.has_role_no_copy(role) {
                     continue;
                 }
