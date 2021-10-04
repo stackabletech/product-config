@@ -78,7 +78,7 @@ where
     let mut result = String::new();
     for (k, v) in properties {
         let escaped_value = match v {
-            Some(value) => escape(&value),
+            Some(value) => escape(value),
             None => continue,
         };
         let escaped_key = escape(k);
