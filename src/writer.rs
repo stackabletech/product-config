@@ -129,7 +129,7 @@ pub fn wrap_hadoop_xml_snippet<T: AsRef<str>>(snippet: T) -> String {
 #[cfg(test)]
 mod tests {
     use crate::writer::{
-        to_hadoop_xml, to_hadoop_xml_snippet, to_java_properties_string, write_java_properties,
+        to_hadoop_xml_snippet, to_java_properties_string, write_java_properties,
         PropertiesWriterError,
     };
     use std::collections::{BTreeMap, HashMap};
@@ -154,7 +154,6 @@ mod tests {
         assert!(result.contains("ab&amp;"));
         assert!(!result.contains("foo"));
         assert!(result.contains(PROPERTY_2));
-        println!("{}", to_hadoop_xml(&result));
     }
 
     #[test]
