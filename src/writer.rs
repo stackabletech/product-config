@@ -1,7 +1,7 @@
 use java_properties::{PropertiesError, PropertiesWriter};
 use std::io::Write;
 use thiserror::Error;
-use xml::escape::{escape_str_attribute, escape_str_pcdata};
+use xml::escape::escape_str_attribute;
 
 #[derive(Error, Debug, PartialEq)]
 pub enum PropertiesWriterError {
@@ -81,7 +81,7 @@ where
             Some(value) => escape_str_attribute(value),
             None => continue,
         };
-        let escaped_key = escape_str_pcdata(k);
+        let escaped_key = escape_str_attribute(k);
         result.push_str(&format!(
             "  <property>\n    <name>{}</name>\n    <value>{}</value>\n  </property>\n",
             escaped_key, escaped_value
