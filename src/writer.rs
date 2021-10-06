@@ -1,7 +1,7 @@
 use java_properties::{PropertiesError, PropertiesWriter};
 use std::io::Write;
 use thiserror::Error;
-use v_htmlescape::escape;
+use xml::escape::escape_str_attribute;
 
 #[derive(Error, Debug, PartialEq)]
 pub enum PropertiesWriterError {
@@ -78,10 +78,10 @@ where
     let mut result = String::new();
     for (k, v) in properties {
         let escaped_value = match v {
-            Some(value) => escape(value),
+            Some(value) => escape_str_attribute(value),
             None => continue,
         };
-        let escaped_key = escape(k);
+        let escaped_key = escape_str_attribute(k);
         result.push_str(&format!(
             "  <property>\n    <name>{}</name>\n    <value>{}</value>\n  </property>\n",
             escaped_key, escaped_value
@@ -129,7 +129,7 @@ pub fn wrap_hadoop_xml_snippet<T: AsRef<str>>(snippet: T) -> String {
 #[cfg(test)]
 mod tests {
     use crate::writer::{
-        to_hadoop_xml_snippet, to_java_properties_string, write_java_properties,
+        to_hadoop_xml, to_hadoop_xml_snippet, to_java_properties_string, write_java_properties,
         PropertiesWriterError,
     };
     use std::collections::{BTreeMap, HashMap};
@@ -206,6 +206,23 @@ mod tests {
 
         let result = String::from_utf8(output).unwrap();
         assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_xml_escape_attributes() {
+        // TODO: make rstest and check pc data as well
+        let mut data = BTreeMap::new();
+        let no_escaping = "file:///foo:bar/foo?bar=123";
+        let to_escape = "<abc>";
+        let to_escape_expected = "&lt;abc&gt;";
+
+        data.insert("not_escaped".to_string(), Some(no_escaping.to_string()));
+        data.insert("to_escaped".to_string(), Some(to_escape.to_string()));
+
+        let result = to_hadoop_xml(data.iter());
+
+        assert!(result.contains(no_escaping));
+        assert!(result.contains(to_escape_expected));
     }
 
     fn calculate_result<'a, T>(properties: T) -> String
