@@ -1,13 +1,15 @@
+use std::path::PathBuf;
+
 use crate::types::PropertyValueSpec;
 use crate::PropertyName;
 
 #[derive(thiserror::Error, Clone, Debug, PartialOrd, PartialEq)]
 pub enum Error {
     #[error("File not found: {file_name}")]
-    FileNotFound { file_name: String },
+    FileNotFound { file_name: PathBuf },
 
     #[error("Could not parse yaml file - {file}: {reason}")]
-    YamlFileNotParsable { file: String, reason: String },
+    YamlFileNotParsable { file: PathBuf, reason: String },
 
     #[error("Could not parse yaml - {content}: {reason}")]
     YamlNotParsable { content: String, reason: String },
