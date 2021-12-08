@@ -12,6 +12,7 @@
 //! - additional information like web links or descriptions
 //!
 use std::collections::{BTreeMap, HashMap};
+use std::path::Path;
 use std::string::String;
 use std::{fs, str};
 
@@ -86,13 +87,13 @@ impl ProductConfigManager {
     /// # Arguments
     ///
     /// * `file_path` - the path to the YAML file
-    pub fn from_yaml_file(file_path: &str) -> ValidationResult<Self> {
-        let contents = fs::read_to_string(file_path).map_err(|_| error::Error::FileNotFound {
-            file_name: file_path.to_string(),
+    pub fn from_yaml_file(file_path: impl AsRef<Path>) -> ValidationResult<Self> {
+        let contents = fs::read_to_string(&file_path).map_err(|_| error::Error::FileNotFound {
+            file_name: file_path.as_ref().to_path_buf(),
         })?;
 
         Self::from_str(&contents).map_err(|serde_error| error::Error::YamlFileNotParsable {
-            file: file_path.to_string(),
+            file: file_path.as_ref().to_path_buf(),
             reason: serde_error.to_string(),
         })
     }
