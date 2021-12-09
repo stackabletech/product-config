@@ -90,7 +90,7 @@ jobs:
         run: cargo clippy --all-targets -- -D warnings
 
   cargo-deny:
-    name: Run cargo deny (bans licenses sources)
+    name: Run cargo deny
     runs-on: ubuntu-latest
     strategy:
       matrix:
