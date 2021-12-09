@@ -3,6 +3,9 @@
 All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
+
+## [0.3.0] - 2021-12-09
+
 ### Changed
 - `ProductConfigManager::from_yaml_file` now takes a `&Path` as well as `&str` ([#43])
 

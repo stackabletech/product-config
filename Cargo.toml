@@ -5,7 +5,7 @@ edition = "2018"
 license = "Apache-2.0"
 name = "product-config"
 repository = "https://github.com/stackabletech/product-config"
-version = "0.3.0-nightly"
+version = "0.3.0"
 
 [dependencies]
 java-properties = "1.3"
