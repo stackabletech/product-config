@@ -25,9 +25,6 @@ jobs:
       - uses: actions-rs/cargo@v1.0.3
         with:
           command: test
-      - uses: actions-rs/cargo@v1.0.3
-        with:
-          command: clean
 
   rustfmt:
     name: Run rustfmt
@@ -73,6 +70,7 @@ jobs:
             toolchain: stable
             components: clippy
             override: true
+      - uses: Swatinem/rust-cache@v1.3.0
       # We need this due to: https://github.com/actions-rs/clippy-check/issues/2
       - name: Check workflow permissions
         id: check_permissions
@@ -92,7 +90,7 @@ jobs:
         run: cargo clippy --all-targets -- -D warnings
 
   cargo-deny:
-    name: Run cargo deny
+    name: Run cargo deny (bans licenses sources)
     runs-on: ubuntu-latest
     strategy:
       matrix:
