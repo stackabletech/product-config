@@ -710,6 +710,28 @@ mod tests {
             "ENV_INTEGER_PORT_MIN_MAX".to_string() => PropertyValidationResult::Valid("1024".to_string()),
         })
     )]
+    #[case::get_iso8601_duration_user_value_invalid(
+        &PropertyNameKind::Env,
+        "role_1",
+        "data/test_yamls/validate_iso8601_duration.yaml",
+        macro_to_hash_map(collection!{
+            "ENV_STARTUP_DELAY".to_string() => Some("invalid".to_string())
+        }),
+        macro_to_get_result(collection!{
+            "ENV_STARTUP_DELAY".to_string() => PropertyValidationResult::Error("invalid".to_string(), Error::DatatypeRegexNotMatching { property_name: "ENV_STARTUP_DELAY".to_string(), value: "invalid".to_string() })
+        })
+    )]
+    #[case::get_iso8601_duration_user_value_invalid(
+        &PropertyNameKind::Env,
+        "role_1",
+        "data/test_yamls/validate_iso8601_duration.yaml",
+        macro_to_hash_map(collection!{
+            "ENV_STARTUP_DELAY".to_string() => Some("PT300S".to_string())
+        }),
+        macro_to_get_result(collection!{
+            "ENV_STARTUP_DELAY".to_string() => PropertyValidationResult::Valid("PT300S".to_string())
+        })
+    )]
     fn test_get(
         #[case] kind: &PropertyNameKind,
         #[case] role: &str,
