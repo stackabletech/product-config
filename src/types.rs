@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 use std::{fmt, ops};
 
-use regex::Regex;
+use fancy_regex::Regex;
 use schemars::gen::SchemaGenerator;
 use schemars::schema::Schema;
 use schemars::JsonSchema;
@@ -327,8 +327,8 @@ where
 }
 
 impl ops::Deref for StackableRegex {
-    type Target = regex::Regex;
-    fn deref(&self) -> &regex::Regex {
+    type Target = Regex;
+    fn deref(&self) -> &Regex {
         &self.compiled
     }
 }
