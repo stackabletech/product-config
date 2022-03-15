@@ -113,11 +113,24 @@ fn check_datatype_string(
     check_bound::<usize>(name, len, max, max_bound)?;
 
     if let Some(unit) = unit {
-        if !unit.regex.is_match(value) {
-            return Err(Error::DatatypeRegexNotMatching {
-                property_name: name.to_string(),
-                value: value.to_string(),
-            });
+        match unit.regex.is_match(value) {
+            Ok(is_match) => {
+                if !is_match {
+                    return Err(Error::DatatypeRegexNotMatching {
+                        property_name: name.to_string(),
+                        value: value.to_string(),
+                    });
+                }
+            }
+            Err(e) => {
+                return Err(Error::RegexNotEvaluable {
+                    property_name: name.to_string(),
+                    unit: unit.name.to_string(),
+                    regex: unit.regex.to_string(),
+                    value: value.to_string(),
+                    reason: e.to_string(),
+                })
+            }
         }
     }
 

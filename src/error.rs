@@ -89,6 +89,15 @@ pub enum Error {
     #[error("Invalid regex pattern for unit '{unit}': '{regex}'")]
     InvalidRegexPattern { unit: String, regex: String },
 
+    #[error("The regex for unit '{unit}' ('{regex}') could not be evaluated on property '{property_name}' (value: '{value}'): {reason}.")]
+    RegexNotEvaluable {
+        property_name: String,
+        unit: String,
+        regex: String,
+        value: String,
+        reason: String,
+    },
+
     #[error("[{property_name}]: unit not provided")]
     UnitNotProvided { property_name: PropertyName },
 
