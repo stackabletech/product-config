@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- replaced `regex` with `fancy-regex` to support look-ahead in unit regexes ([#56])
+
+[#56]: https://github.com/stackabletech/product-config/pull/56
+
 ## [0.3.0] - 2021-12-09
 
 ### Changed
