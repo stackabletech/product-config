@@ -26,6 +26,7 @@ use std::ops::Deref;
 use std::str::FromStr;
 
 pub mod error;
+pub mod flask_app_config_writer;
 pub mod ser;
 pub mod types;
 pub mod writer;
@@ -153,7 +154,7 @@ impl ProductConfigManager {
     /// by the recommended values from the product configuration. Finally, if none are available,
     /// the default values from the product configuration are used.
     /// This function also expands properties if they are required for the given role or if the user
-    /// has requested so in the [user_config] parameter.
+    /// has requested so in the `user_config` parameter.
     ///
     ///
     /// # Arguments

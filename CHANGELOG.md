@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Module added for creating Python configuration files for applications based on the Flask App
+  Builder ([#60]).
+
+[#60]: https://github.com/stackabletech/product-config/pull/60
+
 ## [0.3.1] - 2022-03-15
 
 - replaced `regex` with `fancy-regex` to support look-ahead in unit regexes ([#56])
