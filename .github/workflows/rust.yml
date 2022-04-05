@@ -105,6 +105,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
-      - uses: EmbarkStudios/cargo-deny-action@v1.2.12
+      - uses: EmbarkStudios/cargo-deny-action@v1.2.15
         with:
           command: check ${{ matrix.checks }}
