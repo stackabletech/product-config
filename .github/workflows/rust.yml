@@ -23,7 +23,7 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
-      - uses: Swatinem/rust-cache@v1.4.0
+      - uses: Swatinem/rust-cache@v2.0.1
       - uses: actions-rs/cargo@v1.0.3
         with:
           command: test
@@ -55,7 +55,7 @@ jobs:
           toolchain: stable
           components: rustfmt
           override: true
-      - uses: Swatinem/rust-cache@v1.4.0
+      - uses: Swatinem/rust-cache@v2.0.1
       - uses: actions-rs/cargo@v1.0.3
         with:
           command: doc
@@ -72,7 +72,7 @@ jobs:
             toolchain: stable
             components: clippy
             override: true
-      - uses: Swatinem/rust-cache@v1.4.0
+      - uses: Swatinem/rust-cache@v2.0.1
       # We need this due to: https://github.com/actions-rs/clippy-check/issues/2
       - name: Check workflow permissions
         id: check_permissions
