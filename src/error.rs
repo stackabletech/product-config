@@ -46,7 +46,7 @@ pub enum Error {
     #[error("No role was provided by user for '{name}' ")]
     PropertySpecRoleNotProvidedByUser { name: PropertyName },
 
-    #[error("[{0}]: provided value '{received}' violates min/max bound '{expected}'")]
+    #[error("[{property_name}]: provided value '{received}' violates min/max bound '{expected}'")]
     PropertyValueOutOfBounds {
         property_name: String,
         received: String,
