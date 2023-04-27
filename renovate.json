@@ -27,6 +27,5 @@
     "schedule": [
       "after 5:00 and before 6:00 every weekday"
     ]
-  },
-  "ignorePaths": [".github/workflows/build.yml", ".github/workflows/daily_security.yml", ".github/workflows/reviewdog.yaml"]
+  }
 }
