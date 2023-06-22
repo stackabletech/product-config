@@ -32,8 +32,8 @@ where
 /// Accepts HashMap<String, Option<String>> or BTreeMap<String, Option<String>>.
 /// The map is written as follows (where key=String and val=Option<String>)
 /// val = None          -> key=
-/// val = Some("")      -> key=""
-/// val = Some("foo")   -> key="abc"
+/// val = Some("")      -> key=
+/// val = Some("foo")   -> key=abc
 pub fn write_java_properties<'a, W, T>(writer: W, properties: T) -> Result<(), PropertiesError>
 where
     W: Write,
@@ -41,11 +41,7 @@ where
 {
     let mut writer = PropertiesWriter::new(writer);
     for (k, v) in properties {
-        let property_value = match v {
-            Some(value) if value.is_empty() => "\"\"",
-            Some(value) => value,
-            None => "",
-        };
+        let property_value = v.as_deref().unwrap_or_default();
         writer.write(k, property_value)?;
     }
 
@@ -197,7 +193,7 @@ mod tests {
         btree_map.insert("empty".to_string(), Some("".to_string()));
         btree_map.insert("none".to_string(), None);
 
-        let expected = "empty=\"\"\nnone=\nnormal=normal\n";
+        let expected = "empty=\nnone=\nnormal=normal\n";
 
         let mut output = Vec::new();
         write_java_properties(&mut output, btree_map.iter())

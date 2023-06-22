@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- Quotes are no longer emitted for empty strings in java.properties files ([#88]).
+
+[#88]: https://github.com/stackabletech/product-config/pull/88
+
 ## [0.4.0] - 2022-04-14
 
 ### Added
