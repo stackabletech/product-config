@@ -193,7 +193,7 @@ mod tests {
         btree_map.insert("empty".to_string(), Some("".to_string()));
         btree_map.insert("none".to_string(), None);
 
-        let expected = "empty=\"\"\nnone=\nnormal=normal\n";
+        let expected = "empty=\nnone=\nnormal=normal\n";
 
         let mut output = Vec::new();
         write_java_properties(&mut output, btree_map.iter())
