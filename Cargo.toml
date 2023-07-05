@@ -8,7 +8,7 @@ repository = "https://github.com/stackabletech/product-config"
 version = "0.4.0"
 
 [dependencies]
-java-properties = "1.3"
+java-properties = "2.0"
 fancy-regex = "0.11"
 schemars = "0.8"
 semver = "1.0"
