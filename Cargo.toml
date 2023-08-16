@@ -5,7 +5,7 @@ edition = "2021"
 license = "Apache-2.0"
 name = "product-config"
 repository = "https://github.com/stackabletech/product-config"
-version = "0.4.0"
+version = "0.5.0"
 
 [dependencies]
 java-properties = "2.0"
