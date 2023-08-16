@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.5.0] - 2022-08-16
+
 ### Changed
 
 - Quotes are no longer emitted for empty strings in java.properties files ([#88]).
@@ -37,7 +39,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 - Support to generate Hadoop configuration XML ([#35])
- 
+
 [#35]: https://github.com/stackabletech/product-config/pull/35
 
 ## [0.1.0] - 2021-09-01
