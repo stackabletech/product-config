@@ -108,23 +108,34 @@ use std::{
     str::{FromStr, ParseBoolError},
 };
 
-use thiserror::Error;
+use snafu::{ResultExt, Snafu};
 
 /// Errors which can occur when using this module
-#[derive(Debug, Error)]
+#[derive(Debug, Snafu)]
 pub enum FlaskAppConfigWriterError {
-    #[error("Value is not a valid identifier.")]
-    ConvertIdentifierError(String),
-    #[error("Value cannot be converted into a boolean literal.")]
-    ConvertBoolLiteralError(#[from] ParseBoolError),
-    #[error("Value cannot be converted into an integer literal.")]
-    ConvertIntLiteralError(#[from] ParseIntError),
-    #[error("Value cannot be converted into an ASCII string literal.")]
-    ConvertStringLiteralError(String),
-    #[error("Value cannot be converted into a Python expression.")]
-    ConvertExpressionError(String),
-    #[error("Configuration cannot be written.")]
-    WriteConfigError(#[from] io::Error),
+    #[snafu(display("failed to convert '{value}' into a identifier"))]
+    ConvertIdentifierError { value: String },
+
+    #[snafu(display("failed to convert '{value}' into a boolean literal"))]
+    ConvertBoolLiteralError {
+        value: String,
+        source: ParseBoolError,
+    },
+
+    #[snafu(display("failed to convert '{value}' into an integer literal"))]
+    ConvertIntLiteralError {
+        value: String,
+        source: ParseIntError,
+    },
+
+    #[snafu(display("failed to convert '{value}' into an ASCII string literal"))]
+    ConvertStringLiteralError { value: String },
+
+    #[snafu(display("failed to convert '{value}' into a Python expression"))]
+    ConvertExpressionError { value: String },
+
+    #[snafu(display("Configuration cannot be written."))]
+    WriteConfigError { source: io::Error },
 }
 
 /// Mapping from configuration options to Python types.
@@ -170,9 +181,7 @@ impl PythonType {
         {
             Ok(value.to_string())
         } else {
-            Err(FlaskAppConfigWriterError::ConvertIdentifierError(
-                value.to_string(),
-            ))
+            ConvertIdentifierSnafu { value }.fail()
         }
     }
 
@@ -180,23 +189,21 @@ impl PythonType {
         value
             .parse::<bool>()
             .map(|b| if b { "True".into() } else { "False".into() })
-            .map_err(FlaskAppConfigWriterError::from)
+            .context(ConvertBoolLiteralSnafu { value })
     }
 
     fn convert_to_python_int_literal(value: &str) -> Result<String, FlaskAppConfigWriterError> {
         value
             .parse::<i64>()
             .map(|i| i.to_string())
-            .map_err(FlaskAppConfigWriterError::from)
+            .context(ConvertIntLiteralSnafu { value })
     }
 
     fn convert_to_python_string_literal(value: &str) -> Result<String, FlaskAppConfigWriterError> {
         if value.is_ascii() {
             Ok(format!("\"{}\"", value.escape_default()))
         } else {
-            Err(FlaskAppConfigWriterError::ConvertStringLiteralError(
-                value.to_string(),
-            ))
+            ConvertStringLiteralSnafu { value }.fail()
         }
     }
 
@@ -204,9 +211,7 @@ impl PythonType {
         if !value.trim().is_empty() {
             Ok(value.to_string())
         } else {
-            Err(FlaskAppConfigWriterError::ConvertExpressionError(
-                value.to_string(),
-            ))
+            ConvertExpressionSnafu { value }.fail()
         }
     }
 }
@@ -223,9 +228,10 @@ where
     W: Write,
 {
     for import in imports {
-        writeln!(writer, "{import}")?;
+        writeln!(writer, "{import}").context(WriteConfigSnafu)?;
     }
-    writeln!(writer)?;
+
+    writeln!(writer).context(WriteConfigSnafu)?;
 
     for (name, value) in properties {
         let variable = PythonType::Identifier.convert_to_python(name)?;
@@ -237,7 +243,7 @@ where
             .unwrap_or(PythonType::Expression)
             .convert_to_python(value)?;
 
-        writeln!(writer, "{variable} = {content}")?;
+        writeln!(writer, "{variable} = {content}").context(WriteConfigSnafu)?;
     }
 
     Ok(())
