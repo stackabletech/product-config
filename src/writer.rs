@@ -24,7 +24,7 @@ where
 {
     let mut output = Vec::new();
     write_java_properties(&mut output, properties)?;
-    Ok(String::from_utf8(output).context(FromUtf8Snafu)?)
+    String::from_utf8(output).context(FromUtf8Snafu)
 }
 
 /// Generic method to write java properties
