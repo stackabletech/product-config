@@ -1,15 +1,15 @@
 use java_properties::{PropertiesError, PropertiesWriter};
+use snafu::{ResultExt, Snafu};
 use std::io::Write;
-use thiserror::Error;
 use xml::escape::escape_str_attribute;
 
-#[derive(Error, Debug, PartialEq)]
+#[derive(Debug, Snafu)]
 pub enum PropertiesWriterError {
-    #[error("Error creating properties file: {0}")]
-    PropertiesError(String),
+    #[snafu(display("failed to create properties file"))]
+    PropertiesError { source: PropertiesError },
 
-    #[error("Error converting properties file byte array to UTF-8")]
-    FromUtf8Error(#[from] std::string::FromUtf8Error),
+    #[snafu(display("failed to convert properties file byte array to UTF-8"))]
+    FromUtf8Error { source: std::string::FromUtf8Error },
 }
 
 /// Creates a common Java properties file string in the format:
@@ -23,9 +23,8 @@ where
     T: Iterator<Item = (&'a String, &'a Option<String>)>,
 {
     let mut output = Vec::new();
-    write_java_properties(&mut output, properties)
-        .map_err(|err| PropertiesWriterError::PropertiesError(err.to_string()))?;
-    Ok(String::from_utf8(output)?)
+    write_java_properties(&mut output, properties)?;
+    String::from_utf8(output).context(FromUtf8Snafu)
 }
 
 /// Generic method to write java properties
@@ -34,7 +33,10 @@ where
 /// val = None          -> key=
 /// val = Some("")      -> key=
 /// val = Some("foo")   -> key=abc
-pub fn write_java_properties<'a, W, T>(writer: W, properties: T) -> Result<(), PropertiesError>
+pub fn write_java_properties<'a, W, T>(
+    writer: W,
+    properties: T,
+) -> Result<(), PropertiesWriterError>
 where
     W: Write,
     T: Iterator<Item = (&'a String, &'a Option<String>)>,
@@ -42,10 +44,10 @@ where
     let mut writer = PropertiesWriter::new(writer);
     for (k, v) in properties {
         let property_value = v.as_deref().unwrap_or_default();
-        writer.write(k, property_value)?;
+        writer.write(k, property_value).context(PropertiesSnafu)?;
     }
 
-    writer.flush()?;
+    writer.flush().context(PropertiesSnafu)?;
     Ok(())
 }
 
@@ -196,9 +198,7 @@ mod tests {
         let expected = "empty=\nnone=\nnormal=normal\n";
 
         let mut output = Vec::new();
-        write_java_properties(&mut output, btree_map.iter())
-            .map_err(|err| PropertiesWriterError::PropertiesError(err.to_string()))
-            .unwrap();
+        write_java_properties(&mut output, btree_map.iter()).unwrap();
 
         let result = String::from_utf8(output).unwrap();
         assert_eq!(result, expected);

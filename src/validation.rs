@@ -207,13 +207,11 @@ where
 fn parse<T: FromStr>(name: &str, to_parse: &str) -> Result<T, Error> {
     match to_parse.parse::<T>() {
         Ok(to_parse) => Ok(to_parse),
-        Err(_) => {
-            return Err(Error::DatatypeNotMatching {
-                property_name: name.to_string(),
-                value: to_parse.to_string(),
-                datatype: std::any::type_name::<T>().to_string(),
-            })
-        }
+        Err(_) => Err(Error::DatatypeNotMatching {
+            property_name: name.to_string(),
+            value: to_parse.to_string(),
+            datatype: std::any::type_name::<T>().to_string(),
+        }),
     }
 }
 

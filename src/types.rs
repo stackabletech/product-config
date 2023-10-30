@@ -237,6 +237,7 @@ impl StackableVersion {
     pub fn parse(version: &str) -> ValidationResult<Self> {
         Ok(StackableVersion {
             version: Version::parse(version).map_err(|err| error::Error::InvalidVersion {
+                version: version.to_string(),
                 reason: err.to_string(),
             })?,
         })
