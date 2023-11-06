@@ -109,3 +109,16 @@ jobs:
       - uses: EmbarkStudios/cargo-deny-action@a50c7d5f86370e02fae8472c398f15a36e517bb8 # v1.5.4
         with:
           command: check ${{ matrix.checks }}
+
+  tests_passed:
+    name: All tests passed
+    needs:
+      - run_cargodeny
+      - run_clippy
+      - run_rustfmt
+      - run_rustdoc
+      - run_tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: log
+        run: echo All tests have passed!
