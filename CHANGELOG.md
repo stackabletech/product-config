@@ -11,7 +11,7 @@ All notable changes to this project will be documented in this file.
 - Bump Rust dependencies and Action versions ([#98], [#99], [#100], [#101],
   [#102], [#103], [#104], [#105], [#108]).
 - Update Renovate config ([#106]).
-- Bump Rust version to 1.79.0 ([#CHANGEME]).
+- Bump Rust version to 1.79.0 ([#110]).
 
 [#98]: https://github.com/stackabletech/product-config/pull/98
 [#99]: https://github.com/stackabletech/product-config/pull/99
@@ -23,7 +23,7 @@ All notable changes to this project will be documented in this file.
 [#105]: https://github.com/stackabletech/product-config/pull/105
 [#106]: https://github.com/stackabletech/product-config/pull/106
 [#108]: https://github.com/stackabletech/product-config/pull/108
-[#CHANGEME]: https://github.com/stackabletech/product-config/pull/CHANGEME
+[#110]: https://github.com/stackabletech/product-config/pull/110
 
 ## [0.6.0] - 2023-10-30
 
