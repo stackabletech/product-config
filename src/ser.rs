@@ -24,10 +24,15 @@
 //! let config_map = ser::to_hash_map(&config).unwrap();
 //!
 //! ```
-use serde::de;
-use serde::ser::{self, Serialize};
-use std::collections::HashMap;
-use std::fmt::{self, Display};
+use std::{
+    collections::HashMap,
+    fmt::{self, Display},
+};
+
+use serde::{
+    de,
+    ser::{self, Serialize},
+};
 
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -131,21 +136,19 @@ struct Serializer {
 }
 
 impl<'a> ser::Serializer for &'a mut Serializer {
+    type Error = Error;
     // This is the output type of the Serializer.
     // According to its docs most Serializers should set this to `()` and output to a buffer instead.
     // That's exactly what we're doing.
     // We use the Serializer::output map as our buffer.
     type Ok = ();
-
-    type Error = Error;
-
+    type SerializeMap = Self;
     type SerializeSeq = Self;
+    type SerializeStruct = Self;
+    type SerializeStructVariant = Self;
     type SerializeTuple = Self;
     type SerializeTupleStruct = Self;
     type SerializeTupleVariant = Self;
-    type SerializeMap = Self;
-    type SerializeStruct = Self;
-    type SerializeStructVariant = Self;
 
     // Not sure what to make out of a byte array.
     // Could be converted into a String but for now we don't support it.
@@ -334,8 +337,8 @@ impl<'a> ser::Serializer for &'a mut Serializer {
 }
 
 impl<'a> ser::SerializeMap for &'a mut Serializer {
-    type Ok = ();
     type Error = Error;
+    type Ok = ();
 
     fn serialize_key<T>(&mut self, _: &T) -> Result<()>
     where
@@ -380,8 +383,8 @@ impl<'a> ser::SerializeMap for &'a mut Serializer {
 // Structs are like maps in which the keys are constrained to be compile-time
 // constant strings.
 impl<'a> ser::SerializeStruct for &'a mut Serializer {
-    type Ok = ();
     type Error = Error;
+    type Ok = ();
 
     fn serialize_field<T>(&mut self, key: &'static str, value: &T) -> Result<()>
     where
@@ -414,8 +417,8 @@ impl<'a> ser::SerializeStruct for &'a mut Serializer {
 }
 
 impl<'a> ser::SerializeSeq for &'a mut Serializer {
-    type Ok = ();
     type Error = Error;
+    type Ok = ();
 
     fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<()>
     where
@@ -444,8 +447,8 @@ impl<'a> ser::SerializeSeq for &'a mut Serializer {
 }
 
 impl<'a> ser::SerializeTuple for &'a mut Serializer {
-    type Ok = ();
     type Error = Error;
+    type Ok = ();
 
     fn serialize_element<T>(&mut self, value: &T) -> Result<()>
     where
@@ -474,8 +477,8 @@ impl<'a> ser::SerializeTuple for &'a mut Serializer {
 }
 
 impl<'a> ser::SerializeTupleStruct for &'a mut Serializer {
-    type Ok = ();
     type Error = Error;
+    type Ok = ();
 
     fn serialize_field<T>(&mut self, value: &T) -> Result<()>
     where
@@ -504,8 +507,8 @@ impl<'a> ser::SerializeTupleStruct for &'a mut Serializer {
 }
 
 impl<'a> ser::SerializeTupleVariant for &'a mut Serializer {
-    type Ok = ();
     type Error = Error;
+    type Ok = ();
 
     fn serialize_field<T>(&mut self, value: &T) -> Result<()>
     where
@@ -534,8 +537,8 @@ impl<'a> ser::SerializeTupleVariant for &'a mut Serializer {
 }
 
 impl<'a> ser::SerializeStructVariant for &'a mut Serializer {
-    type Ok = ();
     type Error = Error;
+    type Ok = ();
 
     fn serialize_field<T>(&mut self, key: &'static str, value: &T) -> Result<()>
     where
@@ -571,9 +574,11 @@ impl<'a> ser::SerializeStructVariant for &'a mut Serializer {
 
 #[cfg(test)]
 mod tests {
-    use super::to_hash_map;
-    use serde::Serialize;
     use std::collections::HashMap;
+
+    use serde::Serialize;
+
+    use super::to_hash_map;
 
     #[test]
     fn test_struct() {

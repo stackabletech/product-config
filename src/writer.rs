@@ -1,6 +1,7 @@
+use std::io::Write;
+
 use java_properties::{PropertiesError, PropertiesWriter};
 use snafu::{ResultExt, Snafu};
-use std::io::Write;
 use xml::escape::escape_str_attribute;
 
 #[derive(Debug, Snafu)]
@@ -126,11 +127,12 @@ pub fn wrap_hadoop_xml_snippet<T: AsRef<str>>(snippet: T) -> String {
 
 #[cfg(test)]
 mod tests {
-    use crate::writer::{
-        to_hadoop_xml, to_hadoop_xml_snippet, to_java_properties_string, write_java_properties,
-        PropertiesWriterError,
-    };
     use std::collections::{BTreeMap, HashMap};
+
+    use crate::writer::{
+        PropertiesWriterError, to_hadoop_xml, to_hadoop_xml_snippet, to_java_properties_string,
+        write_java_properties,
+    };
 
     const PROPERTY_1: &str = "property";
     const PROPERTY_2: &str = "property2";

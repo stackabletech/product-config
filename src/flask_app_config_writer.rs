@@ -251,12 +251,14 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{write, FlaskAppConfigOptions, FlaskAppConfigWriterError, PythonType};
-    use rstest::*;
     use std::{
         collections::BTreeMap,
-        str::{from_utf8, FromStr},
+        str::{FromStr, from_utf8},
     };
+
+    use rstest::*;
+
+    use super::{FlaskAppConfigOptions, FlaskAppConfigWriterError, PythonType, write};
 
     #[rstest]
     #[case::valid_identifiers_are_converted_to_python(

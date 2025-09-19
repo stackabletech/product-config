@@ -1,7 +1,9 @@
-use crate::error::Error;
-use crate::types::{Datatype, PropertySpec, Unit};
-use std::fmt::Display;
-use std::str::FromStr;
+use std::{fmt::Display, str::FromStr};
+
+use crate::{
+    error::Error,
+    types::{Datatype, PropertySpec, Unit},
+};
 
 pub type ValidationResult<T> = Result<T, Error>;
 
@@ -129,7 +131,7 @@ fn check_datatype_string(
                     regex: unit.regex.to_string(),
                     value: value.to_string(),
                     reason: e.to_string(),
-                })
+                });
             }
         }
     }
@@ -217,9 +219,10 @@ fn parse<T: FromStr>(name: &str, to_parse: &str) -> Result<T, Error> {
 
 #[cfg(test)]
 mod tests {
+    use rstest::*;
+
     use super::*;
     use crate::error::Error;
-    use rstest::*;
 
     // TODO: test check_datatype()
 

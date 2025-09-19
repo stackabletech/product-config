@@ -1,8 +1,14 @@
-use crate::types::{PropertyNameKind, PropertySpec};
-use crate::validation::ValidationResult;
+use std::{
+    collections::{BTreeMap, HashMap},
+    hash::Hash,
+};
+
 use semver::Version;
-use std::collections::{BTreeMap, HashMap};
-use std::hash::Hash;
+
+use crate::{
+    types::{PropertyNameKind, PropertySpec},
+    validation::ValidationResult,
+};
 
 /// Helper to check if any given key is contained in a map.
 pub(crate) fn hashmap_contains_any_key<K, V>(hm: &HashMap<K, V>, possible_keys: &[K]) -> bool
