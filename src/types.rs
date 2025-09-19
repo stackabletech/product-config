@@ -1,10 +1,11 @@
+use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::{fmt, ops};
 
 use fancy_regex::Regex;
-use schemars::gen::SchemaGenerator;
-use schemars::schema::Schema;
+use schemars::generate::SchemaGenerator;
 use schemars::JsonSchema;
+use schemars::Schema;
 use semver::Version;
 use serde::{de, Deserialize, Deserializer, Serializer};
 
@@ -295,7 +296,7 @@ where
 }
 
 impl JsonSchema for StackableVersion {
-    fn schema_name() -> String {
+    fn schema_name() -> Cow<'static, str> {
         todo!()
     }
     fn json_schema(_gen: &mut SchemaGenerator) -> Schema {
@@ -348,7 +349,7 @@ impl PartialEq for StackableRegex {
 }
 
 impl JsonSchema for StackableRegex {
-    fn schema_name() -> String {
+    fn schema_name() -> Cow<'static, str> {
         todo!()
     }
     fn json_schema(_gen: &mut SchemaGenerator) -> Schema {
