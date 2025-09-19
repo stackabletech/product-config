@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## Changed
+
+- Bump `fancy-regex`, `schemars`, `xml` and `rstest` ([#112]).
+
+[#112]: https://github.com/stackabletech/product-config/pull/112
+
 ## [0.7.0] - 2024-07-09
 
 ### Changed
