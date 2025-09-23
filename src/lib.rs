@@ -11,19 +11,24 @@
 //! - apply mode for config changes (e.g. restart)
 //! - additional information like web links or descriptions
 //!
-use std::collections::{BTreeMap, HashMap};
-use std::path::Path;
-use std::string::String;
-use std::{fs, str};
+use std::{
+    collections::{BTreeMap, HashMap},
+    fs,
+    ops::Deref,
+    path::Path,
+    str,
+    str::FromStr,
+    string::String,
+};
 
 use semver::Version;
 
-use crate::error::Error;
-use crate::types::{ProductConfig, PropertyName, PropertyNameKind, PropertySpec, StackableVersion};
-use crate::util::expand_properties;
-use crate::validation::{check_allowed_values, ValidationResult};
-use std::ops::Deref;
-use std::str::FromStr;
+use crate::{
+    error::Error,
+    types::{ProductConfig, PropertyName, PropertyNameKind, PropertySpec, StackableVersion},
+    util::expand_properties,
+    validation::{ValidationResult, check_allowed_values},
+};
 
 pub mod error;
 pub mod flask_app_config_writer;
@@ -65,6 +70,7 @@ pub struct ProductConfigManager {
 
 impl FromStr for ProductConfigManager {
     type Err = error::Error;
+
     /// Create a ProductConfig from a YAML string.
     ///
     /// # Arguments
@@ -384,11 +390,10 @@ mod tests {
 
     use std::collections::{BTreeMap, HashMap};
 
-    use super::*;
-    use crate::error::Error;
-    use crate::types::PropertyNameKind;
-    use crate::ProductConfigManager;
     use rstest::*;
+
+    use super::*;
+    use crate::{ProductConfigManager, error::Error, types::PropertyNameKind};
 
     fn macro_to_hash_map(map: HashMap<String, Option<String>>) -> HashMap<String, Option<String>> {
         map

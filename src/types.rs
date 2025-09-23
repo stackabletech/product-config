@@ -1,17 +1,11 @@
-use std::borrow::Cow;
-use std::cmp::Ordering;
-use std::{fmt, ops};
+use std::{borrow::Cow, cmp::Ordering, fmt, ops, ops::Deref};
 
 use fancy_regex::Regex;
-use schemars::generate::SchemaGenerator;
-use schemars::JsonSchema;
-use schemars::Schema;
+use schemars::{JsonSchema, Schema, generate::SchemaGenerator};
 use semver::Version;
-use serde::{de, Deserialize, Deserializer, Serializer};
+use serde::{Deserialize, Deserializer, Serializer, de};
 
-use crate::error;
-use crate::validation::ValidationResult;
-use std::ops::Deref;
+use crate::{error, validation::ValidationResult};
 
 #[derive(Clone, Debug, Deserialize, Eq, JsonSchema, PartialOrd, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -43,6 +37,7 @@ pub struct PropertyAnchor {
 
 impl ops::Deref for PropertyAnchor {
     type Target = PropertySpec;
+
     fn deref(&self) -> &PropertySpec {
         &self.property
     }
@@ -247,6 +242,7 @@ impl StackableVersion {
 
 impl ops::Deref for StackableVersion {
     type Target = Version;
+
     fn deref(&self) -> &Version {
         &self.version
     }
@@ -299,6 +295,7 @@ impl JsonSchema for StackableVersion {
     fn schema_name() -> Cow<'static, str> {
         todo!()
     }
+
     fn json_schema(_gen: &mut SchemaGenerator) -> Schema {
         todo!()
     }
@@ -330,6 +327,7 @@ where
 
 impl ops::Deref for StackableRegex {
     type Target = Regex;
+
     fn deref(&self) -> &Regex {
         &self.compiled
     }
@@ -352,6 +350,7 @@ impl JsonSchema for StackableRegex {
     fn schema_name() -> Cow<'static, str> {
         todo!()
     }
+
     fn json_schema(_gen: &mut SchemaGenerator) -> Schema {
         todo!()
     }

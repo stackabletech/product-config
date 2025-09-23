@@ -2,8 +2,7 @@ use std::path::PathBuf;
 
 use snafu::Snafu;
 
-use crate::types::PropertyValueSpec;
-use crate::PropertyName;
+use crate::{PropertyName, types::PropertyValueSpec};
 
 #[derive(Clone, Debug, PartialOrd, PartialEq, Snafu)]
 pub enum Error {
@@ -19,14 +18,18 @@ pub enum Error {
     #[snafu(display("failed to parse '{version}' as SemVer version: {reason}"))]
     InvalidVersion { reason: String, version: String },
 
-    #[snafu(display("[{property_name}]: current product version is '{product_version}' -> property not supported; available from version '{required_version}'"))]
+    #[snafu(display(
+        "[{property_name}]: current product version is '{product_version}' -> property not supported; available from version '{required_version}'"
+    ))]
     VersionNotSupported {
         property_name: PropertyName,
         product_version: String,
         required_version: String,
     },
 
-    #[snafu(display("[{property_name}]: current product version is '{product_version}' -> property deprecated since version '{deprecated_version}'"))]
+    #[snafu(display(
+        "[{property_name}]: current product version is '{product_version}' -> property deprecated since version '{deprecated_version}'"
+    ))]
     VersionDeprecated {
         property_name: String,
         product_version: String,
@@ -60,7 +63,9 @@ pub enum Error {
     #[snafu(display("[{property_name}]: config value missing for required property"))]
     PropertyValueMissing { property_name: String },
 
-    #[snafu(display("[{property_name}]: provided property value(s) missing for version '{version}'. Got: {property_values:?}"))]
+    #[snafu(display(
+        "[{property_name}]: provided property value(s) missing for version '{version}'. Got: {property_values:?}"
+    ))]
     PropertySpecValueMissingForVersion {
         property_name: PropertyName,
         property_values: Vec<PropertyValueSpec>,
@@ -95,7 +100,9 @@ pub enum Error {
     #[snafu(display("invalid regex pattern for unit '{unit}': '{regex}'"))]
     InvalidRegexPattern { unit: String, regex: String },
 
-    #[snafu(display("the regex for unit '{unit}' ('{regex}') could not be evaluated on property '{property_name}' (value: '{value}'): {reason}."))]
+    #[snafu(display(
+        "the regex for unit '{unit}' ('{regex}') could not be evaluated on property '{property_name}' (value: '{value}'): {reason}."
+    ))]
     RegexNotEvaluable {
         property_name: String,
         unit: String,
