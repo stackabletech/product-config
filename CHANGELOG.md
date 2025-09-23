@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.8.0] - 2025-09-23
+
 ## Changed
 
 - Bump `fancy-regex`, `schemars`, `xml` and `rstest` ([#112]).
