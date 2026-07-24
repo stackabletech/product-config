@@ -1,3 +1,11 @@
 = product-config
 
+[IMPORTANT]
+====
+*This repository has been archived and is no longer maintained.* The validation
+logic it once provided is now built directly into the operators that used to
+depend on it, so the library is no longer needed as a standalone component.
+The code remains available for reference.
+====
+
 A library to validate product configuration properties with regard to version, data type, minimum and maximum bounds, dependencies, roles etc.
